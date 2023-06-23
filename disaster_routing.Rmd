@@ -54,8 +54,6 @@ origin <- c(6.943241, 50.334265)
 origin_sf <- st_as_sf(data.frame(longitude=origin[1], latitude=origin[2]), coords = c("longitude", "latitude"), crs = 4326)
 destination <- c(7.119166, 50.548979)
 destination_sf <- st_as_sf(data.frame(longitude=destination[1], latitude=destination[2]), coords = c("longitude", "latitude"), crs = 4326)
-print(test)
-print(your_api_key)
 
 route <- ors_directions(list(origin,destination), api_key = your_api_key, output = "sf", instructions=F)
 
