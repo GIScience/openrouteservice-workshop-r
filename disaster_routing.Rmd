@@ -1,0 +1,231 @@
+---
+title: "Disaster aware routing with openrouteservice"
+author: "Marcel Reinmuth"
+date: "2023-06-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+
+### Install and import necessary libraries
+
+For this exercise we use the following R libraries:
+
+-   `dplyr` for the ease of manipulating data.frame classes Wickham H, François R, Henry L, Müller K, Vaughan D (2023). *dplyr: A Grammar of Data Manipulation*. R package version 1.1.2, <https://CRAN.R-project.org/package=dplyr>.
+-   `sf` the dplyr equivalent to work with spatial data.frames. Pebesma, E., & Bivand, R. (2023). Spatial Data Science: With Applications in R (1st ed.). Chapman and Hall/CRC. <https://doi.org/10.1201/9780429459016>
+-   `openrouteservice` is the package that provides a user firendly R interface to the openrouteservice API. The package is not published on CRAN, therefore we install it via the `devtools` package from github.
+-   `mapview` is a easy to use library to create interactive maps. Appelhans T, Detsch F, Reudenbach C, Woellauer S (2022). *mapview: Interactive Viewing of Spatial Data in R*. R package version 2.11.0, <https://CRAN.R-project.org/package=mapview>.
+
+```{r install libs, eval=F}
+#install.packages(c("dplyr","sf","devtools", "mapview"))
+#devtools::install_github("GIScience/openrouteservice-r")
+```
+
+```{r import libs, message=F}
+library(dplyr)
+library(tidyr)
+library(sf)
+library(openrouteservice)
+library(mapview)
+
+library(geojsonsf)
+library(jsonlite)
+library(rjson)
+library(units)
+library(mapedit)
+library(tmap)
+library(ggplot2)
+
+
+your_api_key <- "5b3ce3597851110001cf62482faa30fe250c47f7ac496634a48dca1d"
+
+```
+
+## Simple route with avoid area
+
+### Normal route from disaster relief stagin area towards Bad Neuanahr-Ahrweiler
+
+```{r}
+origin <- c(6.943241, 50.334265)
+origin_sf <- st_as_sf(data.frame(longitude=origin[1], latitude=origin[2]), coords = c("longitude", "latitude"), crs = 4326)
+destination <- c(7.119166, 50.548979)
+destination_sf <- st_as_sf(data.frame(longitude=destination[1], latitude=destination[2]), coords = c("longitude", "latitude"), crs = 4326)
+print(test)
+print(your_api_key)
+
+route <- ors_directions(list(origin,destination), api_key = your_api_key, output = "sf", instructions=F)
+
+
+```
+
+### Avoid area route from disaster relief stagin area towards Bad Neuanahr-Ahrweiler
+
+#### Define area to avoid
+
+Run the following chunk. Select a simplified shape around the *Ahr* river.
+
+```{r, message=F}
+
+
+lf <- mapview(destination_sf)
+
+# draw some polygons that we will select later
+drawing <- lf |> 
+    editMap()
+
+```
+
+The created shape will be passed through to the openrouteservice API in the next Chunk.
+
+```{r}
+
+options <- list(
+  avoid_polygons = 
+    drawing$finished |> st_union() |> st_as_sf() |> sf_geojson() |> rjson::fromJSON()
+)
+
+disaster_route <- ors_directions(
+  list(origin,destination), 
+  api_key = your_api_key, 
+  output = "sf", 
+  instructions=F, 
+  options=options
+  ) 
+
+disaster_route$type <- "disaster"
+route$type <- "normal"
+
+routes <- rbind(disaster_route, route)
+
+mapview(list(disaster_route$geometry, route$geometry), color=c("red", "green"))
+
+tmap_mode("view")
+
+tm_shape(rbind(destination_sf, origin_sf)) +
+ tm_symbols() +
+tm_shape(routes) +
+  tm_lines("type", palette=c("firebrick3", "lightgreen"), lwd=4)
+  
+
+```
+
+```{r}
+affected_roads_bridges <- st_read("data/affected_roads.gpkg")
+affected_places <- st_read("data/affected_places.gpkg")
+```
+
+```{r}
+affected_roads_bridges <- affected_roads_bridges |> 
+  st_transform(25832) |> 
+  st_buffer(4) |> 
+  st_transform(4326)|> 
+  st_union() |> 
+  st_as_sf() |> 
+  st_make_valid()
+
+
+options <- list(
+  avoid_polygons = 
+    affected_roads_bridges |> sf_geojson() |> rjson::fromJSON()
+)
+
+```
+
+```{r}
+for (a in 1:nrow(affected_places)) {
+  
+  tryCatch({
+    directions <- ors_directions(
+      list(
+        origin, 
+        affected_places[a,] |> st_coordinates() |> c()
+        ),
+      api_key = your_api_key, 
+      output = "sf", 
+      instructions=F
+    )
+    directions_avoid <- ors_directions(
+      list(
+        origin, 
+        affected_places[a,] |> st_coordinates() |> c()
+        ), 
+      api_key = your_api_key, 
+      output = "sf", 
+      instructions=F, 
+      options=options
+    )
+    
+    directions$type <- "normal"
+    directions_avoid$type <- "avoid"
+    directions <- rbind(directions, directions_avoid)
+    
+    directions$id <- a
+    directions$destination <- affected_places[a,]$name
+   if (a==1) {
+     routes <- directions
+   } else {
+     routes <- rbind(routes, directions)
+   }
+  },
+  error = function(e)
+  {
+    print(glue::glue("Error on destination: {affected_places[a,]$name}"))
+    print(affected_places[a,]$osm_id)
+  })
+}
+```
+
+```{r}
+
+routes_tbl <- routes |> unnest_wider(summary) # <- routes |> select(c(type, summary, geometry))
+routes$distance <- routes_tbl$distance |> set_units("m") |> set_units("km")
+routes$duration <- routes_tbl$duration |> set_units("s") |>  set_units("min")
+routes <- routes |> select(c(id, destination, type, distance, duration, geometry))
+
+routes <- routes |>  mutate(dur_diff_abs = 
+                    case_when(
+                      type== "normal" ~ abs(duration - lead(duration)),
+                      type== "avoid" ~ abs(duration - lag(duration)),
+                      TRUE ~ NA)) 
+
+```
+
+```{r}
+
+## not reachable
+affected_places |> filter(name %in% c("Altenburg", "Brück 2", "Schuld 4", "Pützfeld"))
+
+routes <- routes |> filter(type=="avoid") |> 
+  arrange(desc(dur_diff_abs))
+
+routes$destination <- factor(routes$destination, levels=routes$destination)
+
+intervals <- classInt::classIntervals(routes$dur_diff_abs |> drop_units(), n = 5, style = "fixed", fixedBreaks = c(0,1, 5, 10, 20, 50), intervalClosure = "right")
+routes$class <- cut(routes$dur_diff_abs |> drop_units(), intervals$brks, labels = c("A", "B", "C", "D", "E"), include.lowest = T)
+
+routes |> ggplot(aes(x=destination, y=dur_diff_abs, fill=class)) +
+geom_bar(stat="Identity") +
+  labs(main="title", x="Affected Places", y="duration difference after flood") +
+  scale_color_grey() + theme_classic() + theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1))
+
+
+```
+
+```{r}
+tmap_mode("view")
+
+
+
+tm_shape(affected_places) + 
+  tm_symbols(size=.5, col="lightblue") +
+  tm_shape(origin_sf) + 
+  tm_symbols(size = 4, col="yellow3",) +
+  tm_shape(routes) +
+  tm_lines(col="class", lwd=2) +
+  tm_facets("type", sync = T)
+  
+```
