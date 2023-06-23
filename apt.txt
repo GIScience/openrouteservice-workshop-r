@@ -1,2 +1,2 @@
 vim
-libsecret
+libsecret-1-0
