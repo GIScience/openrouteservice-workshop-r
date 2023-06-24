@@ -25,7 +25,8 @@ This training aims to familiarize participants with the capabilities of openrout
 Before we delve into the details of utilizing openrouteservice, let's ensure that we have all the necessary prerequisites in place. The following code chunk provides instructions on how to install the required packages. The openrouteservice R library is currently not published on CRAN, but can be conveniently installed through the devtools packages `install_github` function:
 
 ```{r install libs, eval=F}
-install.packages(c("devtools"))
+install.packages(c("devtools", "dplyr","sf","tidyr","geojsonsf","jsonlite",
+                   "rjson","units","classInt","tmap","ggplot2",,"mapview","mapedit"))
 devtools::install_github("GIScience/openrouteservice-r")
 ```
 
@@ -199,12 +200,9 @@ Feel free to play around with the parameters in the chunks provided above. You c
 
 For example, what if the staging area had been set up in the area of the city of Koblenz (east) or Bonn (north) instead of at the Nürburgring? What would have been the difference in time and distance?
 
-Building upon the concepts and skills acquired, we tackle a more complex
-task. We utilize data from the Copernicus Emergency Mapping service,
-which provides information on destroyed or damaged roads and bridges in
-the Ahr valley, to calculate routes from the disaster relief staging
-area at the Nürburgring. Our objective is to reach 36
-locations representing the affected communities in the valley.
+## Multiple Routes
+
+Building upon the concepts and skills acquired, we tackle a more complex task. We utilize data from the Copernicus Emergency Mapping service, which provides information on destroyed or damaged roads and bridges in the Ahr valley, to calculate routes from the disaster relief staging area at the Nürburgring. Our objective is to reach 36 locations representing the affected communities in the valley.
 
 For this purpose we need the following additional data:
 
@@ -322,6 +320,8 @@ routes <- routes |>  mutate(dur_diff_abs =
                                 TRUE ~ NA
                               )) 
 ```
+
+## Analysis & Evaluation
 
 ```{r classify}
 
