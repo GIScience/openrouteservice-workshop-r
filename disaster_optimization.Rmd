@@ -34,7 +34,7 @@ We'll solve this complex problem with the optimization endpoint of [openrouteser
 Before we get to action, we need to make sure the openrouteservice library is installed. If not run the chunk below.
 
 ```{r install libs, eval=F}
-install.packages(c("devtools", "dplyr","sf","geojsonsf"."readr","units","googlePolylines",
+install.packages(c("devtools", "dplyr","sf","geojsonsf","readr","units","googlePolylines",
                    "jsonlite","tmap","ggplot2",,"mapview"))
 devtools::install_github("GIScience/openrouteservice-r")
 ```
