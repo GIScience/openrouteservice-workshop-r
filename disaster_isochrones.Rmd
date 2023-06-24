@@ -26,9 +26,8 @@ library(exactextractr)
 # utils
 library(geojsonsf) # sf classes to/from geojsons
 library(units) # add units to numerics
-# 
+#
 # # visualization
-library(mapview) # simple, quick interactive map visualization
 library(mapedit) # create geometries from interactive maps
 library(tmap) # visualize spatial data
 library(ggplot2) # visualize (non-) spatial data
@@ -37,7 +36,8 @@ library(ggplot2) # visualize (non-) spatial data
 
 
 ```{r setting the api key}
-your_api_key <- "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
+your_api_key <-
+  "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
 ```
 
 ```{r}
@@ -50,32 +50,28 @@ bad_neuenahr_sf <-
   )
 ```
 
-
-```{r draw avoid area polygon, message=F}
-
-lf <- mapview(bad_neuenahr_sf)
-
-# draw some polygons that we will select later
-drawing <- lf |> 
-    editMap()
-```
-
 Great! Now we use the created sf representation of your drawn shape and process it into the geojson format, ready to be consumed by the openrouteservice API in the next chunk
 
 ```{r format the avoid area options parameter}
 
-options <- list(
-  avoid_polygons = 
-    drawing$finished |> 
-    st_union() |> 
-    st_as_sf() |> 
-    sf_geojson() |> 
-    rjson::fromJSON()
-)
+affected_roads_bridges <- st_read("data/affected_roads.gpkg")
+
+affected_roads_bridges <- affected_roads_bridges |>
+  st_transform(25832) |>
+  st_buffer(2) |>
+  st_transform(4326) |>
+  st_union() |>
+  st_as_sf() |>
+  st_make_valid()
+
+
+options <- list(avoid_polygons =
+                  affected_roads_bridges |> sf_geojson() |> rjson::fromJSON())
+
 ```
 
-```{r}
 
+```{r}
 
 isochrone <-
   ors_isochrones(
@@ -124,7 +120,7 @@ tm_basemap("OpenStreetMap") +
   ) +
   tm_shape(bad_neuenahr_sf) +
   tm_symbols(size = 0.5)
-  tm_facets("type")
+tm_facets("type")
 
 ```
 
@@ -154,33 +150,15 @@ tm_basemap("OpenStreetMap") +
 physicians <- st_read("data/physicians.gpkg")
 population <- rast("data/wpop_ahrvalley.tif")
 municipalities <- st_read("data/affected_municipalities.gpkg")
-affected_roads_bridges <- st_read("data/affected_roads.gpkg")
 ```
 
-```{r prepare affected infrastructure}
-affected_roads_bridges <- affected_roads_bridges |> 
-  st_transform(25832) |> 
-  st_buffer(2) |> 
-  st_transform(4326) |> 
-  st_union() |> 
-  st_as_sf() |> 
-  st_make_valid()
-
-
-options <- list(
-  avoid_polygons = 
-    affected_roads_bridges |> sf_geojson() |> rjson::fromJSON()
-)
-
-```
 
 ```{r loop regular and disaster routes to comm}
 for (a in 1:nrow(physicians)) {
-  
   tryCatch({
     # request a regular isochrone around location of physician
     isochrone_regular <- ors_isochrones(
-      physicians[a, ] |> st_coordinates() |> c(),
+      physicians[a,] |> st_coordinates() |> c(),
       api_key = your_api_key,
       output = "sf",
       profile = "driving-car",
@@ -189,7 +167,7 @@ for (a in 1:nrow(physicians)) {
     )
     # request a disaster aware route from staging to community
     isochrone_avoid <- ors_isochrones(
-      physicians[a,] |> st_coordinates() |> c(),
+      physicians[a, ] |> st_coordinates() |> c(),
       api_key = your_api_key,
       output = "sf",
       profile = "driving-car",
@@ -205,9 +183,9 @@ for (a in 1:nrow(physicians)) {
     
     # add id to relate place and isochrone later on
     isochrone$id <- a
-    physicians[a, ]$id <- a
+    physicians[a,]$id <- a
     # also add the name of the respective physician to the isochrone
-    isochrone$destination <- physicians[a, ]$name
+    isochrone$destination <- physicians[a,]$name
     
     # check for the first iteration to init the result sf data frame
     if (a == 1) {
@@ -233,7 +211,8 @@ for (a in 1:nrow(physicians)) {
 
 ```{r}
 
-isochrone_union <- isochrones |> st_make_valid() |>  group_by(value, type) |> 
+isochrone_union <-
+  isochrones |> st_make_valid() |>  group_by(value, type) |>
   summarize(geometry = st_union(geometry)) |> st_make_valid()
 
 tm_basemap("OpenStreetMap") +
@@ -254,56 +233,60 @@ tm_basemap("OpenStreetMap") +
 
 ```{r, warning=F, message=F}
 
+
 for (m in 1:nrow(municipalities)) {
-  
-  mun <- municipalities[m,] # select single municipality
+  mun <- municipalities[m, ] # select single municipality
   
   mun_iso <-
     isochrones |> st_make_valid() |>
     filter(st_intersects(geometry, mun, sparse = F)) |>
-    st_intersection(mun) |> 
+    st_intersection(mun) |>
     group_by(value, type) |>
-    summarize(geometry = st_union(geometry)) |> 
-    ungroup() |> 
-    filter( st_geometry_type(geometry) == "POLYGON" |
-            st_geometry_type(geometry) == "MULTIPOLYGON"
-            ) 
+    summarize(geometry = st_union(geometry)) |>
+    ungroup() |>
+    filter(
+      st_geometry_type(geometry) == "POLYGON" |
+        st_geometry_type(geometry) == "MULTIPOLYGON"
+    )
   
   
-  mun_total_pop <- population |> exact_extract(mun, "sum", progress=T)
-  mun_total_area <- mun |>  
-    st_transform(25832) |> 
-    st_area() |> 
+  mun_total_pop <-
+    population |> exact_extract(mun, "sum", progress = T)
+  mun_total_area <- mun |>
+    st_transform(25832) |>
+    st_area() |>
     set_units("km^2")
   
   mun_iso$name <- mun$name
   mun_iso$id <- mun$id
   
   # add population
-  mun_iso$population_cum <- population |> 
-    exact_extract(mun_iso, "sum", progress=F) 
+  mun_iso$population_cum <- population |>
+    exact_extract(mun_iso, "sum", progress = F)
   
   # add area
-  mun_iso$area_cum <- mun_iso |>  
-    st_transform(25832) |> 
-    st_area() |> 
+  mun_iso$area_cum <- mun_iso |>
+    st_transform(25832) |>
+    st_area() |>
     set_units("km^2")
   
-  mun_iso <- mun_iso |> 
-    group_by(value, type) |> 
-    arrange(desc(value)) |> 
-    mutate(area = area_cum - lead(area_cum, default = set_units(0, "km^2")),
-           pop = population_cum - lead(population_cum, default = 0),
-           area_rel = area / mun_total_area,
-           pop_rel = pop / mun_total_pop) |>  
+  mun_iso <- mun_iso |>
+    group_by(value, type) |>
+    arrange(desc(value)) |>
+    mutate(
+      area = area_cum - lead(area_cum, default = set_units(0, "km^2")),
+      pop = population_cum - lead(population_cum, default = 0),
+      area_rel = area / mun_total_area,
+      pop_rel = pop / mun_total_pop
+    ) |>
     ungroup()
   
   if (m == 1) {
-     mun_isos <- mun_iso
+    mun_isos <- mun_iso
     # if not just append to the result sf data frame
-   } else {
-     mun_isos <- rbind(mun_isos, mun_iso)
-   }
+  } else {
+    mun_isos <- rbind(mun_isos, mun_iso)
+  }
   
 }
 
@@ -313,8 +296,10 @@ for (m in 1:nrow(municipalities)) {
 ```{r}
 library(ggplot2)
 
-mun_isos$value <-
-  mun_isos$value |> factor(levels = c(seq(300, 1800, 300), 9999))
+mun_sort <- mun_isos |> filter(value==1200 & type=="regular")
+mun_sort <- mun_sort |> arrange(pop_rel)
+mun_isos$name <- factor(mun_isos$name, levels=c(mun_sort$name,"Münsch"))
+
 
 mun_isos |> #filter(value < 9999) |>
   mutate(value = factor(value, levels = c(seq(300, 1800, 300)))) |>
@@ -322,7 +307,6 @@ mun_isos |> #filter(value < 9999) |>
   geom_bar(stat = "identity", position = position_dodge()) +
   scale_fill_grey() +
   theme_classic() +
-  
   theme(axis.text.x = element_text(
     angle = 45,
     vjust = 1,
@@ -334,9 +318,10 @@ mun_isos |> #filter(value < 9999) |>
 ```
 
 ```{r}
-hexagons <- st_sf(geometry=st_make_grid(municipalities, square=F, n=c(50,50))) |> 
-  filter(
-  st_intersects(geometry, municipalities |> st_union(), sparse=F))
+hexagons <-
+  st_sf(geometry = st_make_grid(municipalities, square = F, n = c(50, 50))) |>
+  filter(st_intersects(geometry, municipalities |> st_union(), sparse =
+                         F))
 ```
 
 ```{r}
@@ -369,9 +354,11 @@ hexagons1200$count <- lengths(st_intersects(
         st_make_valid()))
 
 hexagons_all <- rbind(hexagons300, hexagons600, hexagons900, hexagons1200)
+```
 
+```{r}
 tm_shape(hexagons_all) +
-  tm_polygons("count", palette="magma") +
+  tm_polygons("count", palette="magma", lwd=.1) +
   tm_facets("value")
 
 
