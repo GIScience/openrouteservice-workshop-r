@@ -164,7 +164,7 @@ Perfect. Let's visualize the results.
 
 ```{r visualize simple regular and disaster route}
 # add a attribute to both routes to be able to differentiate.
-disaster_route$type <- "disaster"
+disaster_route$type <- "avoid"
 route$type <- "regular"
 
 # merge them into one single sf dataframe
@@ -279,8 +279,7 @@ for (a in 1:nrow(affected_places)) {
   error = function(e)
   {
     # print info on affected communities that openrouteservice could not route to
-    print(glue::glue("Error on destination: {affected_places[a,]$name}"))
-    print(affected_places[a,]$osm_id)
+    print(glue::glue("Error on center: {affected_places[a,]$name}; iteration: {a}/{nrow(affected_places)}"))
   })
 }
 ```
