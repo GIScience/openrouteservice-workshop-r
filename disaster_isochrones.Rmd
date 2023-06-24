@@ -1,46 +1,85 @@
 ---
 title: "Disaster aware isochrones with openrouteservice"
 author: "Marcel Reinmuth"
-date: "2023-06-23"
-output: html_document
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    theme: cerulean
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Intro
+
+During times of disaster, such as the devastating flood event in Germany's Ahr valley in July 2021, isochrones can support emergency responders, humanitarian organizations, and disaster management teams. Openrouteservice, an open-source routing engine utilizing OpenStreetMap data, offers a flexible and powerful solution for generating isochrones and addressing logistical challenges in such critical situations.
+
+This training aims to familiarize participants with the capabilities of openrouteservice's isochrone generation within R and demonstrate how it can be leveraged to enhance disaster response planning. Through a series of code examples, we will explore the key features and functionalities of openrouteservice's isochrone API. You will learn how easy it is to interact with openrouteservice from R and be able to integrate isochrone analysis directly into your own workflow.
+
+By utilizing openrouteservice's isochrone capabilities, participants will gain the ability to analyze and visualize travel time polygons, highlighting areas reachable within specific time thresholds. This information is invaluable for identifying high-priority locations, optimizing evacuation routes, and strategically positioning resources during emergencies. Through hands-on exercises, you will learn how to customize isochrone parameters, such as travel modes, durations, and destination points, to tailor the analysis to your specific needs.
+
+## Setup
+
+Before we delve into the details of utilizing openrouteservice, let's ensure that we have all the necessary prerequisites in place. The following code chunk provides instructions on how to install the required packages. The openrouteservice R library is currently not published on CRAN, but can be conveniently installed through the devtools packages `install_github` function. Same applies to the exactextract library, it provides us with a set of methods to conduct zonal statistic methods.
 
 ```{r install libs, eval=F}
-#install.packages(c("dplyr","sf","devtools", "mapview"))
-#devtools::install_github("GIScience/openrouteservice-r")
+install.packages(c("devtools","dplyr","sf","terra",
+                   "geojsonsf","units","tmap","ggplot2"))
+devtools::install_github("GIScience/openrouteservice-r")
+devtools::install_github("isciences/exactextract")
 ```
+
+Additional libraries we will need for this training:
 
 ```{r import libs, message=F}
 # main libraries
 library(dplyr) # manipulating tabular data
 library(sf) # geospatial classes and datastructures - the swiss army knife on GIS in R
 library(openrouteservice) # interface to openrouteservice API
-library(terra)
-library(exactextractr)
+library(terra) # handle all sorts of raster data
+library(exactextractr) # sophisticated, fast extraction from raster to vector more: https://github.com/isciences/exactextract
 
 # utils
 library(geojsonsf) # sf classes to/from geojsons
 library(units) # add units to numerics
 #
 # # visualization
-library(mapedit) # create geometries from interactive maps
 library(tmap) # visualize spatial data
 library(ggplot2) # visualize (non-) spatial data
 
 ```
 
+In order to use the openrouteservice public api you need to register yourself an account and create an api key.
+
+-   Sign up here: [openrouteservice.org/dev/#/login](https://openrouteservice.org/dev/#/login)
+-   Or consult our step by step guide as part of the resources we've provided you in the workshop book here: [giscience.github.io/openrouteservice-workshop](https://giscience.github.io/openrouteservice-workshop)
+
+When you sucessfully created your personal api key, copy it over in the chunk below.
 
 ```{r setting the api key}
 your_api_key <-
   "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
 ```
 
-```{r}
+## Context
+
+During the Ahr valley flood event, many roads and bridges were damaged or rendered impassable, posing significant challenges for navigation and transportation. You may have already done the other exercise on disaster aware routing in the ahr valley during the flood disaster. There we used the avoid areas parameter of openrouteservices directions endpoint to calculate routes which do not intersect with determined areas, in this very case flooded areas. But openrouteservic can also combine avoid areas with isochrones.
+
+What is an isochrone again?
+
+*An isochrone is a geographical representation of areas that can be reached within a specified travel time or distance from a given location.*
+
+## Single isochrone and avoid areas
+
+Let's try it out. In the following code chunk we define a location in the city of Bad Neunahr-Ahrweiler. We then pass the coordinates to accompanied by some options for the isochrone service API parameters. Contrary to the directions api, we only need one coordinate. It serves as the center from which the isochrone is calculated. We can add more options, customizing our request. Many options are the same to directions. So there is also a profile, that is the option of mode of transport. Motorized, on foot or by bicycle. Or the shortest or fastest route. Isochrones specific are for example range_type, range and interval. Range type specifies the unit of measurement of time or distance. Range specifies the total range. With the option interval partial isochrones can be calculated at the same time. For this example, we use time as the unit and a total range of 20 minutes divided into intervals of 5.
+
+### Regular from a location in Bad Neuanahr-Ahrweiler
+
+```{r define single center}
 bad_neuenahr <- c(7.119166, 50.548979)
 bad_neuenahr_sf <-
   st_as_sf(
@@ -48,13 +87,30 @@ bad_neuenahr_sf <-
     coords = c("longitude", "latitude"),
     crs = 4326
   )
+
+isochrone <-
+  ors_isochrones(
+    bad_neuenahr,
+    profile = "driving-car",
+    range = 1200,
+    interval = 300,
+    output = "sf",
+    api_key = your_api_key,
+    range_type = "time"
+  )
 ```
 
-Great! Now we use the created sf representation of your drawn shape and process it into the geojson format, ready to be consumed by the openrouteservice API in the next chunk
+Great, you requested your first isochrone. Before we visualize it, lets get another one with avoid areas, and compare them in one go.
+
+The following code is familiar to you if you have already edited the directions exercise. We use data from Copernicus Emergency Mapping Service, , which provides information on destroyed or damaged roads and bridges in the Ahr valley.
+
+-   `affected_roads_bridges` All damaged and destroyed roads and bridges provided by the Copernicus Emergency Mapping Service. This dataset as well as others are available here: <https://emergency.copernicus.eu/mapping/list-of-components/EMSR517>
+
+We convert it to polygons, ready to be consumed by the openrouteservice API as avoid areas.
 
 ```{r format the avoid area options parameter}
 
-affected_roads_bridges <- st_read("data/affected_roads.gpkg")
+affected_roads_bridges <- st_read("data/affected_roads.gpkg", quiet=T)
 
 affected_roads_bridges <- affected_roads_bridges |>
   st_transform(25832) |>
@@ -70,38 +126,33 @@ options <- list(avoid_polygons =
 
 ```
 
+Then we are good to go to request a second isochrone but with avoid areas. At the end of the code chunk we combine both dataframes to make visualization easier.
 
 ```{r}
-
-isochrone <-
-  ors_isochrones(
-    bad_neuenahr,
-    profile = "driving-car",
-    range = 1200,
-    interval = 200,
-    output = "sf",
-    api_key = your_api_key
-  )
 
 isochrone_avoid <-
   ors_isochrones(
     bad_neuenahr,
     profile = "driving-car",
     range = 1200,
-    interval = 200,
+    interval = 300,
     output = "sf",
     api_key = your_api_key,
-    options = options
+    options = options,
+    range_type = "time"
   )
 
 isochrone$type <- "regular"
 isochrone_avoid$type <- "avoid"
 
-isochrones <- rbind(isochrone, isochrone_avoid)
-isochrones <- isochrones |> arrange(desc(value))
+both_isochrones <- rbind(isochrone, isochrone_avoid)
+both_isochrones <- both_isochrones |> arrange(desc(value))
 
 ```
 
+The next chunk visualizes both isochrones. Can you spot the difference?
+
+Look south of the center of the isochrones. This area is not reachable according to the disaster aware isochrone in 20 minutes. We further see some hints about the infrastructure. Both isochrones extend quite far from south east to north west. This is due to the *Autobahn* *A61*.
 
 ```{r visualize simple regular and disaster isochrone}
 # add a attribute to both routes to be able to differentiate.
@@ -109,7 +160,7 @@ isochrones <- isochrones |> arrange(desc(value))
 tmap_mode("view")
 
 tm_basemap("OpenStreetMap") +
-  tm_shape(isochrones) +
+  tm_shape(both_isochrones) +
   tm_polygons(
     "value",
     title = "Traveltime in seconds",
@@ -118,40 +169,33 @@ tm_basemap("OpenStreetMap") +
     lwd = NA,
     breaks = c(0, 200, 400, 600, 800, 1000, 1200)
   ) +
+tm_facets("type") +
   tm_shape(bad_neuenahr_sf) +
   tm_symbols(size = 0.5)
-tm_facets("type")
 
 ```
 
-```{r visualize simple regular and disaster isochrone}
-# add a attribute to both routes to be able to differentiate.
+## Multiple Isochrones - local physicians catchments
 
-tmap_mode("view")
+In the next part of the exercise, we will utilize the openrouteservice isochrone API to generate catchment areas with a travel time of 30 minutes for each of the 20 physician locations in the Ahr valley. This analysis will involve creating regular isochrones as well as isochrones that account for avoid areas, specifically areas that do not intersect with damaged infrastructure caused by the flood disaster. To gain further insights, we will integrate population data and examine any changes in catchment areas resulting from the impact of the flood disaster. This comprehensive approach will provide valuable information for assessing healthcare accessibility and the potential challenges faced during the disaster.
 
-tm_basemap("OpenStreetMap") +
-  tm_shape(bad_neuenahr_sf) +
-  tm_symbols(size = 0.5) +
-  tm_shape(isochrones) +
-  tm_polygons(
-    "value",
-    title = "Traveltime in seconds",
-    palette = "magma",
-    alpha = 1,
-    lwd = NA,
-    breaks = c(0, 200, 400, 600, 800, 1000, 1200)
-  ) +
-  tm_facets("type")
+For this purpose we need the following additonal datasets:
 
-```
+-   `physicians` Exported osm objects with the tag amenity=doctors or healthcare=doctor via overpass.
 
+-   `population` Worldpop population counts for the Ahr valley <https://hub.worldpop.org/geodata/summary?id=49977>
 
-```{r}
+-   `municipalities` Boundaries of affected municipalities <https://gdz.bkg.bund.de/index.php/default/digitale-geodaten/verwaltungsgebiete/verwaltungsgebiete-1-250-000-mit-einwohnerzahlen-stand-31-12-vg250-ew-31-12.html>
+
+```{r data input}
 physicians <- st_read("data/physicians.gpkg")
 population <- rast("data/wpop_ahrvalley.tif")
 municipalities <- st_read("data/affected_municipalities.gpkg")
 ```
 
+### Get the isochrones
+
+Similar to the directions exercise, we conduct multiple openrouteservice requests in a loop. We loop over all physicians, as they serve as the center for our isochrone analysis. We request a regular isochrone and one with avoid polygons. Then we add some additional attributes from our physician dataset to the response isochrones and save them in a sf dataframe. This may take a little while, you may have a coffe in the mean time.
 
 ```{r loop regular and disaster routes to comm}
 for (a in 1:nrow(physicians)) {
@@ -163,7 +207,8 @@ for (a in 1:nrow(physicians)) {
       output = "sf",
       profile = "driving-car",
       range = 1800,
-      interval = 300
+      interval = 300,
+      range_type = "time"
     )
     # request a disaster aware route from staging to community
     isochrone_avoid <- ors_isochrones(
@@ -173,7 +218,8 @@ for (a in 1:nrow(physicians)) {
       profile = "driving-car",
       range = 1800,
       interval = 300,
-      options = options
+      options = options,
+      range_type = "time"
     )
     
     # add attribute to differentiate the results later
@@ -208,8 +254,9 @@ for (a in 1:nrow(physicians)) {
 }
 ```
 
+Well done. Lets look at the result.
 
-```{r}
+```{r viz isochrones}
 
 isochrone_union <-
   isochrones |> st_make_valid() |>  group_by(value, type) |>
@@ -230,6 +277,10 @@ tm_basemap("OpenStreetMap") +
   tm_symbols(size = 0.5)
 
 ```
+
+Any pattern you spot right away?
+
+### Combine isochrones with population counts by municipality boundaries
 
 ```{r, warning=F, message=F}
 
@@ -292,13 +343,14 @@ for (m in 1:nrow(municipalities)) {
 
 ```
 
+## Analysis and evaluation
 
 ```{r}
 library(ggplot2)
 
-mun_sort <- mun_isos |> filter(value==1200 & type=="regular")
+mun_sort <- mun_isos |> filter(value == 1200 & type == "regular")
 mun_sort <- mun_sort |> arrange(pop_rel)
-mun_isos$name <- factor(mun_isos$name, levels=c(mun_sort$name,"Münsch"))
+mun_isos$name <- factor(mun_isos$name, levels = c(mun_sort$name, "Münsch"))
 
 
 mun_isos |> #filter(value < 9999) |>
@@ -317,12 +369,18 @@ mun_isos |> #filter(value < 9999) |>
 
 ```
 
+## Add-on: capacity
+
+How many physicians potentialy serve an area?
+
 ```{r}
 hexagons <-
   st_sf(geometry = st_make_grid(municipalities, square = F, n = c(50, 50))) |>
   filter(st_intersects(geometry, municipalities |> st_union(), sparse =
                          F))
 ```
+
+## 
 
 ```{r}
 
@@ -364,8 +422,4 @@ tm_shape(hexagons_all) +
 
 ```
 
-
 can you repeat this for foot-walking profile?
-
-
-https://hub.worldpop.org/geodata/summary?id=49977
