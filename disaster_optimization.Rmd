@@ -10,108 +10,327 @@ output:
     theme: cerulean
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-```{r}
-your_api_key <- "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
-library(openrouteservice)
-library(readr)
+## Intro
+
+Routing optimization generally solves the Vehicle Routing Problem (a simple example being the more widely known Traveling Salesman Problem). A more complex example would be the distribution of goods by a fleet of multiple vehicles to dozens of locations, where each vehicle has certain time windows in which it can operate and each delivery location has certain time windows in which it can be served (e.g. opening times of a supermarket).
+
+In this example we'll look at a real-world scenario of *distributing medical goods during disaster response* following one of the worst tropical cyclones ever been recorded in Africa: Cyclone Idai.
+
+```{r, echo=FALSE, out.width="400px", fig.cap=="Cyclone Idai floods in false color image on 19.03.2019; © Copernicus Sentinel-1 -satellite (modified Copernicus Sentinel data (2019), processed by ESA, CC BY-SA 3.0 IGO)"}
+knitr::include_graphics("https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2019/03/floods_imaged_by_copernicus_sentinel-1/19306823-1-eng-GB/Floods_imaged_by_Copernicus_Sentinel-1_pillars.jpg")
+```
+
+_Cyclone Idai floods in false color image on 19.03.2019; © Copernicus Sentinel-1 -satellite (modified Copernicus Sentinel data (2019), processed by ESA, CC BY-SA 3.0 IGO)[source](https://www.esa.int/ESA_Multimedia/Images/2019/03/Floods_imaged_by_Copernicus_Sentinel-1)_
+
+In this scenario, a humanitarian organization shipped much needed medical goods to Beira, Mozambique, which were then dispatched to local vehicles to be delivered across the region. The supplies included vaccinations and medications for water-borne diseases such as Malaria and Cholera, so distribution efficiency was critical to contain disastrous epidemics.
+
+We'll solve this complex problem with the optimization endpoint of [openrouteservice](https://openrouteservice.org).
+
+
+Before we get to action, we need to make sure the openrouteservice library is installed. If not run the chunk below.
+
+```{r install libs, eval=F}
+install.packages(c("devtools", "dplyr","sf","geojsonsf"."readr","units","googlePolylines",
+                   "jsonlite","tmap","ggplot2",,"mapview"))
+devtools::install_github("GIScience/openrouteservice-r")
+```
+
+Next we call all libraries required for this scernario.
+
+```{r import libs, message=F}
+# main libraries
+library(dplyr) # manipulating tabular data
+library(sf) # geospatial classes and datastructures - the swiss army knife on GIS in R
+library(openrouteservice) # interface to openrouteservice API
+
+# utils
+library(geojsonsf) # sf classes to/from geojsons
+library(units) # add units to numerics
+library(readr) # open csvs, parse timestamps
+library(googlePolylines) # decode binary polylines
+library(jsonlite)
+
+# # visualization
+library(tmap) # visualize spatial data
+library(ggplot2) # visualize (non-) spatial data
+library(mapview)
+
+```
+
+
+In order to use the openrouteservice public api you need to register yourself an account and create an api key.
+
+-   Sign up here: [openrouteservice.org/dev/#/login](https://openrouteservice.org/dev/#/login)
+-   Or consult our step by step guide as part of the resources we've provided you in the workshop book here: [giscience.github.io/openrouteservice-workshop](https://giscience.github.io/openrouteservice-workshop)
+
+When you sucessfully created your personal api key, copy it over in the chunk below.
+
+
+```{r setting the api key}
+your_api_key <-
+  "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
+```
+
+## Logistics Setup
+
+In total 20 sites were identified in need of the medical supplies, while 3 vehicles were scheduled for delivery. Let's assume there was only one type of goods, e.g. standard moving boxes full of one medication. (In reality there were dozens of different good types, which can be modeled with the same workflow, but that would unnecessarily bloat this example).
+
+The vehicles were all located in the port of Beira and had the same following constraints:
+
+* operation time windows from 8:00 to 20:00
+* loading capacity of 300 [arbitrary unit]
+
+The *delivery locations* were mostly located in the Beira region, but some extended ~ 200 km to the north of Beira. Their needs range from 10 to 148 units of the arbitrary medication goods (consult the file located at `data/idai_health_sites.csv`. 
+
+In the Chunk below we load the csv file which contains the delivery locations. We also define the depot of our fleet in Beira.
+
+```{r load data}
+
+# healthsites to be served
 idai_health_sites <- read_csv("data/idai_health_sites.csv", 
     col_types = cols(ID = col_integer(), 
         Open_From = col_datetime(format = "%Y-%m-%d %H:%M:%S"), 
         Open_To = col_datetime(format = "%Y-%m-%d %H:%M:%S"), 
         Needed_Amount = col_integer()))
-#View(idai_health_sites)
+
 
 # The vehicles are all located at the port of Beira
 depot <- data.frame(lon = 34.835447, lat = -19.818474)
 
+idai_health_sites |> st_as_sf(coords=c("Lon", "Lat"), crs=4326) |>  mapview()
+```
+
+## The routing problem setup
 
 
-# 3 vehicles
+Now that we have described the setup sufficiently, we can start to set up our actual Vehicle Routing Problem. For this example we're using the FOSS library of [Vroom](https://github.com/VROOM-Project/vroom). VROOM is independently developed from  openrouteservice but available through its API. 
 
+To properly describe the problem in algorithmic terms, we have to provide the following information:
+
+* vehicles start/end address: vehicle depot in Beira's port
+* vehicle capacity: 300
+* vehicle operational times: 08:00 - 20:00
+* service location: delivery location
+* service time windows: individual delivery location's time window
+* service amount: individual delivery location's needs
+
+We defineall these parameter down in the code and send a request to openrouteservice optimization endpoint at https://api.openrouteservice.org/optimization.
+
+
+Let's have a closer look at vehicles. With the public API we can use up to 3 different vehicles. They can be differentiated by:
+
+* Routing profile: heavy goods vehicles, regular cars, bikes, pedestrians
+* start and end locations
+* Skills: Does a vehicle offer a specific skill that is demanded by a delivery, like cooling capabilities for instance
+* Capacity: How much goods can be transported
+* Time window: During which time is the vehicle operational
+
+```{r define vehicles}
 vehicles = vehicles(
   id = 1:3,
   profile = "driving-hgv",
   start = depot,
   end = depot,
   capacity = 300,
-  #skills = list(c(1, 14), c(2, 14)),
-  #time_window = c(1553241600, 1553284800) # # Fri 8-20:00,
-  # expressed in POSIX timestamp
-  time_window = c(1553241600, 1553284800)
-  #time_window = c(41600, 84800)
+  time_window = c("2019-03-22 05:00:00 UTC" |> as.POSIXct(tz = "UTC") |> as.integer(),
+                  "2019-03-22 23:00:00 UTC" |> as.POSIXct(tz = "UTC") |> as.integer())
 )
+```
 
+And here the delivery locations. 
 
-jobs = jobs(
-  id = idai_health_sites$ID,
-  service = 1200,
-  #amount = idai_health_sites$Needed_Amount,
-  amount = 50,
-  location = Map(c,idai_health_sites$Lon, 
-                   idai_health_sites$Lat),
-  #skills = list(1, 1, 2, 2, 14, 14)
-  time_windows = 
-    Map(c,(idai_health_sites$Open_From |> as.integer() )- 1553200000,
-        (idai_health_sites$Open_To |> as.integer() )-1553200000)
-  #time_windows = list(41600, 84800)
-  )
+* service: The amount of time for a delivery to be done at a location
+* amount: The amount of goods need at a delivery location
+* time_window: Periods in which the location can be visited/ a delivery conducted. Can be multiples
 
-a <- idai_health_sites$Open_From |> as.integer()
-b <- idai_health_sites$Open_To |> as.integer()
-final_list <- lapply(seq_along(a), function(i) list(c(a[i], b[i])))
+```{r define delivery jobs}
+open_from <- idai_health_sites$Open_From |> as.integer()
+open_to <- idai_health_sites$Open_To |> as.integer()
+time_periods <- lapply(seq_along(open_from), function(i) list(c(open_from[i], open_to[i])))
 
 jobs = jobs(
   id = idai_health_sites$ID,
   service = 1200,
   amount = idai_health_sites$Needed_Amount |> lapply(function(x) c(x)),
-  #amount = list(c(50),c(100),c(200)),
-  #amount = list(c(idai_health_sites$Needed_Amount)),
   location = Map(c,idai_health_sites$Lon, 
                    idai_health_sites$Lat),
-  time_window = final_list
+  time_window = time_periods
   )
-
-
-
-res <- ors_optimization(jobs, vehicles, options = list(g=T), api_key=your_api_key)
-
 
 ```
 
+Example of how multiple delivery periods are reprsented in the request.
 
-```{r}
-library(dplyr)
-res$routes
-
-lapply(res$routes, with, {
-  list(
-    geometry = googlePolylines::decode(geometry)[[1L]],
-    locations = lapply(steps, with, if (type=="job") location) %>%
-      do.call(rbind, .) %>% data.frame %>% setNames(c("lon", "lat"))
-  )
-  }) -> routes
-
-## Helper function to add a list of routes and their ordered waypoints
-addRoutes <- function(map, routes, colors) {
-  routes <- mapply(c, routes, color = colors, SIMPLIFY = FALSE)
-  f <- function (map, route) {
-    with(route, {
-      labels <- sprintf("<b>%s</b>", 1:nrow(locations))
-      markers <- awesomeIcons(markerColor = color, text = labels, fontFamily = "arial")
-      map %>%
-        addPolylines(data = geometry, lng = ~lon, lat = ~lat, col = ~color) %>%
-        addAwesomeMarkers(data = locations, lng = ~lon, lat = ~lat, icon = markers)
-    })
-  }
-  Reduce(f, routes, map)
+```{example jsons, eval=F}
+{
+  time_window = [[
+    # first time_window
+    1553238000,
+    1553239800],
+    [
+      # second time window if exist
+      1553243400,
+      1553248800]],
 }
-library(leaflet)
-
-leaflet() %>%
-  addTiles() %>%
-  addAwesomeMarkers(data = depot, icon = awesomeIcons("home")) %>%
-  addRoutes(routes, c("purple", "green"))
 
 ```
 
+Next we can fire the request against the optimization endpoint of openrouteservice. The list passed to options parameter makes sure that we get the route geometries as well.
+
+```{r optimization request}
+res <- ors_optimization(jobs, vehicles, options = list(g=T), api_key=your_api_key)
+```
+
+The response is a nested json / list. Therefore we have to employ some looping and lapply to get to our results. See the comments for more context in the Chunk below
+
+```{r postprocess}
+
+# We loop over every route that is planned by VROOM
+for (r in 1:length(res$routes)) {
+  
+  # Every route bears overview information of the vehicle and its planned trip
+  
+  vehicle_steps <-
+    res$routes[[r]]$steps |> toJSON(auto_unbox = T) |> fromJSON()
+  
+  # Every trip is divided into steps, the travel between delivery locations
+  # It contains information like arrival time, load, distance, and the geometry binary encoded
+  
+  vehicle_steps$vehicle_id <- res$routes[[r]]$vehicle
+  
+  # here we decode it
+  vehicle_route <-
+    googlePolylines::decode(res$routes[[r]]$geometry)[[1L]] |> st_as_sf(coords = c("lon", "lat"), crs = 4326) |> st_combine() |> st_cast("LINESTRING")
+  vehicle_route <- st_sf(vehicle_id = r, geometry = vehicle_route)
+  
+  # if first iteration, overwrite, if not append
+  if (r == 1) {
+    steps <- vehicle_steps
+    routes <- vehicle_route
+  } else {
+    steps <- rbind(steps, vehicle_steps)
+    routes <- rbind(routes, vehicle_route)
+  }
+  
+  routes <- rbind(routes, routes)
+}
+
+# not visited locations are found in the unassigned list
+unassigned <- do.call(rbind,
+                      lapply(res$unassigned, function(x)
+                        c(
+                          id = x$id,
+                          lon = x$location[1],
+                          lat = x$location[2]
+                        )),) |> data.frame() |> st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+```
+
+Now we have extracted the routes and each step into individual dataframes. Much easier to grasp than lists. Next we convert them to sf dataframes to be able to put on a map.
+
+```{r convert to sf}
+steps$lon <- lapply(steps$location, function(x) x[[1]])
+steps$lat <- lapply(steps$location, function(x) x[[2]])
+
+steps <- steps |> filter(type == "job") |> 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+steps <- steps |> select(-c(location))
+
+```
+
+Perfect, lets have look at our planned trips on a map.
+
+```{r visualize}
+mapview(routes,
+        color = c("firebrick3", "darkgreen", "yellow1"),
+        zcol = "vehicle_id") +
+  mapview(steps, color = "grey75", label = "id") +
+  mapview(unassigned, color="orange", label="id")
+
+
+```
+
+Looks like vehicle 1 will get far north and vehicle 3 takes care of the locations in the south. 
+However with the current planning, one Job in the north east won't be visited.
+
+Can you adjust the parameters time_windows or amount to add it?
+
+
+The following code chunk produces an overview of total quanitity, time and distance traveled by vehicle and serves as overview.
+
+```{r overview logistics}
+
+sumry <- do.call(rbind,
+                 lapply(res$routes, function(x)
+                   c(
+                     vehicle = x$vehicle,
+                     amount = x$amount,
+                     duration = x$duration,
+                     distance = x$distance
+                   ))) |> data.frame()
+sumry
+```
+
+Vehicle 2 travelled a lot less than the other vehicles. 
+
+
+The other Chunks show the individual timetables for every vehicle.
+
+```{r vehicle 1 tt, warning=F, message=F}
+# timetable vehicle 1
+
+ttable1 <- do.call(rbind,
+        res$routes[[1]]$steps |> lapply(
+          function(x)
+            c(
+              station_id = ifelse(x$type %in% c("start","end"),x$type,x$id),
+              arrival = ifelse(x$type != "start",x$arrival |> 
+                                 as.POSIXct() |> as.character(),"-"),
+              departure = ifelse(x$type == "end","-",x$arrival |> 
+                                 as.POSIXct() |> as.character()),
+              load = x$load
+            )
+        )) |> data.frame()
+ttable1
+```
+
+```{r vehicle 2 tt, warning=F, message=F}
+# timetable vehicle 2
+
+ttable2 <- do.call(rbind,
+        res$routes[[2]]$steps |> lapply(
+          function(x)
+            c(
+              station_id = ifelse(x$type %in% c("start","end"),x$type,x$id),
+              arrival = ifelse(x$type != "start",x$arrival |> 
+                                 as.POSIXct() |> as.character(),"-"),
+              departure = ifelse(x$type == "end","-",x$arrival |> 
+                                 as.POSIXct() |> as.character()),
+              load = x$load
+            )
+        )) |> data.frame()
+ttable2
+```
+
+```{r vehicle 3 tt, warning=F, message=F}
+# timetable vehicle 3
+
+ttable3 <- do.call(rbind,
+        res$routes[[3]]$steps |> lapply(
+          function(x)
+            c(
+              station_id = ifelse(x$type %in% c("start","end"),x$type,x$id),
+              arrival = ifelse(x$type != "start",x$arrival |> 
+                                 as.POSIXct() |> as.character(),"-"),
+              departure = ifelse(x$type == "end","-",x$arrival |> 
+                                 as.POSIXct() |> as.character()),
+              load = x$load
+            )
+        )) |> data.frame()
+ttable3
+```
