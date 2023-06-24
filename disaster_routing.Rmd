@@ -67,7 +67,8 @@ In order to use the openrouteservice public api you need to register yourself an
 When you sucessfully created your personal api key, copy it over in the chunk below.
 
 ```{r setting the api key}
-your_api_key <- "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
+your_api_key <-
+  "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
 ```
 
 ## Context
@@ -82,17 +83,26 @@ Let's start to use the openrouteservice library by performing a simple A-to-B ro
 
 ```{r simple a b route}
 origin <- c(6.943241, 50.334265)
-origin_sf <- st_as_sf(data.frame(longitude = origin[1], latitude = origin[2]), coords = c("longitude", "latitude"), crs = 4326)
+origin_sf <-
+  st_as_sf(
+    data.frame(longitude = origin[1], latitude = origin[2]),
+    coords = c("longitude", "latitude"),
+    crs = 4326
+  )
 destination <- c(7.119166, 50.548979)
-destination_sf <- st_as_sf(data.frame(
-  longitude = destination[1], 
-  latitude = destination[2]), 
-  coords = c("longitude", "latitude"), crs = 4326)
+destination_sf <- st_as_sf(
+  data.frame(longitude = destination[1],
+             latitude = destination[2]),
+  coords = c("longitude", "latitude"),
+  crs = 4326
+)
 
-route <- ors_directions(list(origin,destination), 
-                        api_key = your_api_key, 
-                        output = "text", 
-                        instructions = F)
+route <- ors_directions(
+  list(origin, destination),
+  api_key = your_api_key,
+  output = "sf",
+  instructions = F
+)
 
 ```
 
@@ -125,12 +135,11 @@ First we need to define an area to be avoided from the route calculation. For th
 Run the following chunk. In the mapview, first zoom out a bit to see the city of Bad Neunahr-Ahrweiler. Next select the polygon or bbox symbol from the left navigation and draw an area around the Ahr river south of Bad Neunahr-Ahrweiler. When you are happy with your drawing, click on the **Done** button in the lower right corner.
 
 ```{r draw avoid area polygon, message=F}
-
 lf <- mapview(destination_sf)
 
 # draw some polygons that we will select later
-drawing <- lf |> 
-    editMap()
+drawing <- lf |>
+  editMap()
 ```
 
 Great! Now we use the created sf representation of your drawn shape and process it into the geojson format, ready to be consumed by the openrouteservice API in the next chunk
@@ -138,11 +147,11 @@ Great! Now we use the created sf representation of your drawn shape and process 
 ```{r format the avoid area options parameter}
 
 options <- list(
-  avoid_polygons = 
-    drawing$finished |> 
-    st_union() |> 
-    st_as_sf() |> 
-    sf_geojson() |> 
+  avoid_polygons =
+    drawing$finished |>
+    st_union() |>
+    st_as_sf() |>
+    sf_geojson() |>
     rjson::fromJSON()
 )
 ```
@@ -151,13 +160,14 @@ Now we can execute the `ors_directions` function again, but with the set avoid a
 
 ```{r create a disaster aware route}
 disaster_route <- ors_directions(
-  list(origin,destination), 
-  api_key = your_api_key, 
-  output = "sf", 
-  instructions = F, 
+  list(origin, destination),
+  api_key = your_api_key,
+  output = "sf",
+  instructions = F,
   options = options # here we pass the set options object with the avoid areas to the options parameter
-  ,profile = "driving-hgv"
-  ) 
+  ,
+  profile = "driving-car"
+) 
 ```
 
 Perfect. Let's visualize the results.
@@ -173,11 +183,13 @@ routes <- rbind(disaster_route, route)
 # we use tmap for visualization in the interactive "view" mode
 tmap_mode("view")
 tm_basemap("OpenStreetMap") +
-tm_shape(rbind(destination_sf, origin_sf)) +
- tm_symbols() +
-tm_shape(routes) +
-  tm_lines("type", palette = c("firebrick3", "darkgrey"), lwd = 4)
-  
+  tm_shape(rbind(destination_sf, origin_sf)) +
+  tm_symbols() +
+  tm_shape(routes) +
+  tm_lines("type",
+           palette = c("firebrick3", "darkgrey"),
+           lwd = 4)
+
 
 ```
 
@@ -210,19 +222,17 @@ affected_places <- st_read("data/affected_places.gpkg")
 As before we need to prepare the avoid areas for the openrouteservice query. The roads and bridges are of type `LINESTRING.` The APIs avoid area parameter however can only consume single polygons or multipolygons. Therefore we need convert it via buffer and union into one continuous multipolygon.
 
 ```{r prepare affected infrastructure}
-affected_roads_bridges <- affected_roads_bridges |> 
-  st_transform(25832) |> 
-  st_buffer(2) |> 
-  st_transform(4326) |> 
-  st_union() |> 
-  st_as_sf() |> 
+affected_roads_bridges <- affected_roads_bridges |>
+  st_transform(25832) |>
+  st_buffer(2) |>
+  st_transform(4326) |>
+  st_union() |>
+  st_as_sf() |>
   st_make_valid()
 
 
-options <- list(
-  avoid_polygons = 
-    affected_roads_bridges |> sf_geojson() |> rjson::fromJSON()
-)
+options <- list(avoid_polygons =
+                  affected_roads_bridges |> sf_geojson() |> rjson::fromJSON())
 
 ```
 
@@ -231,30 +241,27 @@ Next we loop over all communities in `affected_places`. Some communities won't b
 ```{r loop regular and disaster routes to comm}
 affected_places$id <- NA
 for (a in 1:nrow(affected_places)) {
-  
   tryCatch({
     # request a regular route from staging to community
     directions <- ors_directions(
-      list(
-        origin, 
-        affected_places[a,] |> st_coordinates() |> c()
-        ),
-      api_key = your_api_key, 
-      output = "sf", 
+      list(origin,
+           affected_places[a, ] |> st_coordinates() |> c()),
+      api_key = your_api_key,
+      output = "sf",
       instructions = F
-  ,profile = "driving-hgv"
+      ,
+      profile = "driving-car"
     )
     # request a disaster aware route from staging to community
     directions_avoid <- ors_directions(
-      list(
-        origin, 
-        affected_places[a,] |> st_coordinates() |> c()
-        ), 
-      api_key = your_api_key, 
-      output = "sf", 
-      instructions = F, 
+      list(origin,
+           affected_places[a, ] |> st_coordinates() |> c()),
+      api_key = your_api_key,
+      output = "sf",
+      instructions = F,
       options = options
-  ,profile = "driving-hgv"
+      ,
+      profile = "driving-car"
     )
     
     # add attribute to differentiate the results later
@@ -264,22 +271,26 @@ for (a in 1:nrow(affected_places)) {
     
     # add id to relate place and route later on
     directions$id <- a
-    affected_places[a,]$id <- a
+    affected_places[a, ]$id <- a
     # also add the name of the respective destination of the route
-    directions$destination <- affected_places[a,]$name
-   
+    directions$destination <- affected_places[a, ]$name
+    
     # check for the first iteration to init the result sf data frame
     if (a == 1) {
-     routes <- directions
-    # if not just append to the result sf data frame
-   } else {
-     routes <- rbind(routes, directions)
-   }
+      routes <- directions
+      # if not just append to the result sf data frame
+    } else {
+      routes <- rbind(routes, directions)
+    }
   },
   error = function(e)
   {
     # print info on affected communities that openrouteservice could not route to
-    print(glue::glue("Error on center: {affected_places[a,]$name}; iteration: {a}/{nrow(affected_places)}"))
+    print(
+      glue::glue(
+        "Error on place: {affected_places[a,]$name}; iteration: {a}/{nrow(affected_places)}"
+      )
+    )
   })
 }
 ```
@@ -291,49 +302,58 @@ For the communities, however where could generate disaster aware routes, we are 
 ```{r postprocessing}
 
 # unpack distance and duration form a list column
-routes_tbl <- routes |> unnest_wider(summary) 
+routes_tbl <- routes |> unnest_wider(summary)
 
 # add and convert unit information to the column
-routes$distance <- routes_tbl$distance |> set_units("m") |> set_units("km")
-routes$duration <- routes_tbl$duration |> set_units("s") |>  set_units("min")
+routes$distance <-
+  routes_tbl$distance |> set_units("m") |> set_units("km")
+routes$duration <-
+  routes_tbl$duration |> set_units("s") |>  set_units("min")
 
 # keep relevant columns only
-routes <- routes |> select(c(id, destination, type, distance, duration, geometry))
+routes <-
+  routes |> select(c(id, destination, type, distance, duration, geometry))
 
 # calculate a new column dur_diff_abs with the absolute difference in time between regular and disaster aware route
-routes <- routes |>  mutate(dur_diff_abs = 
-                    case_when(
-                      type== "regular" ~ abs(duration - lead(duration)),
-                      type== "avoid" ~ abs(duration - lag(duration)),
-                      TRUE ~ NA)) 
+routes <- routes |>  mutate(dur_diff_abs =
+                              case_when(
+                                type == "regular" ~ abs(duration - lead(duration)),
+                                type == "avoid" ~ abs(duration - lag(duration)),
+                                TRUE ~ NA
+                              )) 
 ```
 
 ```{r classify}
 
-## filter out not reachable 
+## filter out not reachable
 #affected_places |> filter(name %in% c("Altenburg", "Brück 2", "Schuld 4", "Pützfeld"))
 
 # filter for disaster routes only
 routes_avoid <- routes |> filter(type == "avoid")
 
 # create a factor with fixed hierarchy
-routes_avoid$destination <- factor(routes_avoid$destination, 
+routes_avoid$destination <- factor(routes_avoid$destination,
                                    levels = routes_avoid$destination)
 
 # create meaningful classes from the numeric differences
-intervals <- classIntervals(routes_avoid$dur_diff_abs 
-                            |> drop_units(), #convert back to numerics
-                            n = 5, # amount of classes
-                            style = "fixed", 
-                            fixedBreaks = c(0,1, 5, 10, 20, 50),
-                            intervalClosure = "right")
+intervals <- classIntervals(
+  routes_avoid$dur_diff_abs
+  |> drop_units(),
+  #convert back to numerics
+  n = 5,
+  # amount of classes
+  style = "fixed",
+  fixedBreaks = c(0, 1, 5, 10, 20, 50),
+  intervalClosure = "right"
+)
 
 # based on the classification breaks add a new attribute
-routes_avoid$class <- cut(routes_avoid$dur_diff_abs |> drop_units(),
-                          intervals$brks, 
-                          labels = c("A", "B", "C", "D", "E"), 
-                          include.lowest = T)
-
+routes_avoid$class <- cut(
+  routes_avoid$dur_diff_abs |> drop_units(),
+  intervals$brks,
+  labels = c("A", "B", "C", "D", "E"),
+  include.lowest = T
+)
 ```
 
 ```{r join class attribute}
@@ -341,31 +361,38 @@ routes_avoid$class <- cut(routes_avoid$dur_diff_abs |> drop_units(),
 st_geometry(routes_avoid) <- NULL
 
 # join class attribute to the routes sf dataframe
-routes <- routes |> 
-  merge(
-    routes_avoid |> select(c("id","dur_diff_abs", "class"), 
-                           by = "id")
-  )
+routes <- routes |>
+  left_join(routes_avoid |> select(c("id", "dur_diff_abs", "class")),
+            by = "id")
 
 # join class attribute to the affected places sf dataframe
-affected_places <- affected_places |> 
-  left_join(routes_avoid |> 
-              select(c("id", "dur_diff_abs", "class")))
+affected_places <- affected_places |>
+  left_join(routes_avoid |> select(c("id", "dur_diff_abs", "class")),
+            by = "id")
+
 ```
 
 ```{r non spatial visualization}
+routes_avoid <- routes_avoid |> arrange(desc(dur_diff_abs))
+routes_avoid$destination <- factor(routes_avoid$destination, levels=routes_avoid$destination)
 
 routes_avoid |> 
-  ggplot(aes(x = destination, 
-             y = dur_diff_abs, 
-             fill = class))  +
+  ggplot(aes(
+    y = dur_diff_abs,
+    x = destination,
+    fill = class
+  ))  +
   geom_bar(stat = "Identity") + # chart type
-    labs(main = "title", 
-         x = "Affected Places", 
-         y = "duration difference after flood") +
-  scale_color_grey() + 
-  theme_classic() + 
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+  labs(main = "title",
+       x = "Affected Places",
+       y = "duration difference after flood") +
+  scale_color_grey() +
+  theme_classic() +
+  theme(axis.text.x = element_text(
+    angle = 45,
+    vjust = 1,
+    hjust = 1
+  ))
 
 
 ```
@@ -373,12 +400,12 @@ routes_avoid |>
 ```{r spatial visualization}
 tmap_mode("view")
 
-tm_shape(affected_places) + 
-  tm_symbols(size = 2, col = "class") +
-  tm_shape(origin_sf) + 
-  tm_dots("yellow3", size = 2,) +
+tm_shape(affected_places) +
+  tm_symbols(size = 1, col = "class") +
+  tm_shape(origin_sf) +
+  tm_dots("yellow3", size = 1.25, ) +
   tm_shape(routes) +
   tm_lines(col = "lightblue", lwd = 2) +
   tm_facets("type", sync = T)
-  
+
 ```
