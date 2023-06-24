@@ -1,0 +1,117 @@
+---
+title: "Optimizing logistics in disaster situations"
+author: "Marcel Reinmuth"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    theme: cerulean
+---
+
+
+```{r}
+your_api_key <- "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
+library(openrouteservice)
+library(readr)
+idai_health_sites <- read_csv("data/idai_health_sites.csv", 
+    col_types = cols(ID = col_integer(), 
+        Open_From = col_datetime(format = "%Y-%m-%d %H:%M:%S"), 
+        Open_To = col_datetime(format = "%Y-%m-%d %H:%M:%S"), 
+        Needed_Amount = col_integer()))
+#View(idai_health_sites)
+
+# The vehicles are all located at the port of Beira
+depot <- data.frame(lon = 34.835447, lat = -19.818474)
+
+
+
+# 3 vehicles
+
+vehicles = vehicles(
+  id = 1:3,
+  profile = "driving-hgv",
+  start = depot,
+  end = depot,
+  capacity = 300,
+  #skills = list(c(1, 14), c(2, 14)),
+  #time_window = c(1553241600, 1553284800) # # Fri 8-20:00,
+  # expressed in POSIX timestamp
+  time_window = c(1553241600, 1553284800)
+  #time_window = c(41600, 84800)
+)
+
+
+jobs = jobs(
+  id = idai_health_sites$ID,
+  service = 1200,
+  #amount = idai_health_sites$Needed_Amount,
+  amount = 50,
+  location = Map(c,idai_health_sites$Lon, 
+                   idai_health_sites$Lat),
+  #skills = list(1, 1, 2, 2, 14, 14)
+  time_windows = 
+    Map(c,(idai_health_sites$Open_From |> as.integer() )- 1553200000,
+        (idai_health_sites$Open_To |> as.integer() )-1553200000)
+  #time_windows = list(41600, 84800)
+  )
+
+a <- idai_health_sites$Open_From |> as.integer()
+b <- idai_health_sites$Open_To |> as.integer()
+final_list <- lapply(seq_along(a), function(i) list(c(a[i], b[i])))
+
+jobs = jobs(
+  id = idai_health_sites$ID,
+  service = 1200,
+  amount = idai_health_sites$Needed_Amount |> lapply(function(x) c(x)),
+  #amount = list(c(50),c(100),c(200)),
+  #amount = list(c(idai_health_sites$Needed_Amount)),
+  location = Map(c,idai_health_sites$Lon, 
+                   idai_health_sites$Lat),
+  time_window = final_list
+  )
+
+
+
+res <- ors_optimization(jobs, vehicles, options = list(g=T), api_key=your_api_key)
+
+
+```
+
+
+```{r}
+library(dplyr)
+res$routes
+
+lapply(res$routes, with, {
+  list(
+    geometry = googlePolylines::decode(geometry)[[1L]],
+    locations = lapply(steps, with, if (type=="job") location) %>%
+      do.call(rbind, .) %>% data.frame %>% setNames(c("lon", "lat"))
+  )
+  }) -> routes
+
+## Helper function to add a list of routes and their ordered waypoints
+addRoutes <- function(map, routes, colors) {
+  routes <- mapply(c, routes, color = colors, SIMPLIFY = FALSE)
+  f <- function (map, route) {
+    with(route, {
+      labels <- sprintf("<b>%s</b>", 1:nrow(locations))
+      markers <- awesomeIcons(markerColor = color, text = labels, fontFamily = "arial")
+      map %>%
+        addPolylines(data = geometry, lng = ~lon, lat = ~lat, col = ~color) %>%
+        addAwesomeMarkers(data = locations, lng = ~lon, lat = ~lat, icon = markers)
+    })
+  }
+  Reduce(f, routes, map)
+}
+library(leaflet)
+
+leaflet() %>%
+  addTiles() %>%
+  addAwesomeMarkers(data = depot, icon = awesomeIcons("home")) %>%
+  addRoutes(routes, c("purple", "green"))
+
+```
+
