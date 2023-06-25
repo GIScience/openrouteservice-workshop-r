@@ -14,7 +14,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Intro
+# Intro
 
 Routing optimization generally solves the Vehicle Routing Problem (a simple example being the more widely known Traveling Salesman Problem). A more complex example would be the distribution of goods by a fleet of multiple vehicles to dozens of locations, where each vehicle has certain time windows in which it can operate and each delivery location has certain time windows in which it can be served (e.g. opening times of a supermarket).
 
@@ -75,7 +75,7 @@ your_api_key <-
   "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
 ```
 
-## Logistics Setup
+# Logistics Setup
 
 In total 20 sites were identified in need of the medical supplies, while 3 vehicles were scheduled for delivery. Let's assume there was only one type of goods, e.g. standard moving boxes full of one medication. (In reality there were dozens of different good types, which can be modeled with the same workflow, but that would unnecessarily bloat this example).
 
@@ -104,7 +104,7 @@ depot <- data.frame(lon = 34.835447, lat = -19.818474)
 idai_health_sites |> st_as_sf(coords=c("Lon", "Lat"), crs=4326) |>  mapview()
 ```
 
-## The routing problem setup
+# The routing problem setup
 
 
 Now that we have described the setup sufficiently, we can start to set up our actual Vehicle Routing Problem. For this example we're using the FOSS library of [Vroom](https://github.com/VROOM-Project/vroom). VROOM is independently developed from  openrouteservice but available through its API. 
@@ -185,7 +185,10 @@ Next we can fire the request against the optimization endpoint of openrouteservi
 res <- ors_optimization(jobs, vehicles, options = list(g=T), api_key=your_api_key)
 ```
 
+# Postprocess
+
 The response is a nested json / list. Therefore we have to employ some looping and lapply to get to our results. See the comments for more context in the Chunk below
+
 
 ```{r postprocess}
 
@@ -232,6 +235,8 @@ unassigned <- do.call(rbind,
 
 Now we have extracted the routes and each step into individual dataframes. Much easier to grasp than lists. Next we convert them to sf dataframes to be able to put on a map.
 
+# Results and evaluation
+
 ```{r convert to sf}
 steps$lon <- lapply(steps$location, function(x) x[[1]])
 steps$lat <- lapply(steps$location, function(x) x[[2]])
@@ -242,6 +247,8 @@ steps <- steps |> filter(type == "job") |>
 steps <- steps |> select(-c(location))
 
 ```
+
+## Map visualization
 
 Perfect, lets have look at our planned trips on a map.
 
@@ -278,6 +285,7 @@ sumry
 
 Vehicle 2 travelled a lot less than the other vehicles. 
 
+## Time tables 
 
 The other Chunks show the individual timetables for every vehicle.
 

@@ -14,7 +14,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Intro
+# Intro
 
 During times of disaster, such as the devastating flood event in Germany's Ahr valley in July 2021, isochrones can support emergency responders, humanitarian organizations, and disaster management teams. Openrouteservice, an open-source routing engine utilizing OpenStreetMap data, offers a flexible and powerful solution for generating isochrones and addressing logistical challenges in such critical situations.
 
@@ -77,7 +77,7 @@ What is an isochrone again?
 
 Let's try it out. In the following code chunk we define a location in the city of Bad Neunahr-Ahrweiler. We then pass the coordinates to accompanied by some options for the isochrone service API parameters. Contrary to the directions api, we only need one coordinate. It serves as the center from which the isochrone is calculated. We can add more options, customizing our request. Many options are the same to directions. So there is also a profile, that is the option of mode of transport. Motorized, on foot or by bicycle. Or the shortest or fastest route. Isochrones specific are for example range_type, range and interval. Range type specifies the unit of measurement of time or distance. Range specifies the total range. With the option interval partial isochrones can be calculated at the same time. For this example, we use time as the unit and a total range of 20 minutes divided into intervals of 5.
 
-### Regular from a location in Bad Neuanahr-Ahrweiler
+## Regular from a location in Bad Neuanahr-Ahrweiler
 
 ```{r define single center}
 bad_neuenahr <- c(7.119166, 50.548979)
@@ -175,7 +175,7 @@ tm_facets("type") +
 
 ```
 
-## Multiple Isochrones - local physicians catchments
+# Multiple Isochrones - local physicians catchments
 
 In the next part of the exercise, we will utilize the openrouteservice isochrone API to generate catchment areas with a travel time of 30 minutes for each of the 20 physician locations in the Ahr valley. This analysis will involve creating regular isochrones as well as isochrones that account for avoid areas, specifically areas that do not intersect with damaged infrastructure caused by the flood disaster. To gain further insights, we will integrate population data and examine any changes in catchment areas resulting from the impact of the flood disaster. This comprehensive approach will provide valuable information for assessing healthcare accessibility and the potential challenges faced during the disaster.
 
@@ -193,7 +193,7 @@ population <- rast("data/wpop_ahrvalley.tif")
 municipalities <- st_read("data/affected_municipalities.gpkg")
 ```
 
-### Get the isochrones
+## Get the isochrones
 
 Similar to the directions exercise, we conduct multiple openrouteservice requests in a loop. We loop over all physicians, as they serve as the center for our isochrone analysis. We request a regular isochrone and one with avoid polygons. Then we add some additional attributes from our physician dataset to the response isochrones and save them in a sf dataframe. This may take a little while, you may have a coffe in the mean time.
 
@@ -280,15 +280,9 @@ tm_basemap("OpenStreetMap") +
 
 Any pattern you spot right away?
 
-### Combine isochrones with population counts by municipality boundaries
+## Combine isochrones with population counts by municipality boundaries
 
-The next step in our analysis involves overlaying and intersecting the
-isochrone intervals obtained from openrouteservice with municipality
-boundaries. This allows us to examine the impact of the flood damage on
-the catchments of physicians in the Ahr Valley area. By performing this
-intersection, we can identify the areas within each municipality that
-fall within specific travel time intervals, indicating the accessibility
-of physicians before and after the flood.
+The next step in our analysis involves overlaying and intersecting the isochrone intervals obtained from openrouteservice with municipality boundaries. This allows us to examine the impact of the flood damage on the catchments of physicians in the Ahr Valley area. By performing this intersection, we can identify the areas within each municipality that fall within specific travel time intervals, indicating the accessibility of physicians before and after the flood.
 
 Once we have the intersected shapes, we aim to enrich them with population information from the WorldPop dataset. This additional data will provide insights into the population residing within each isochrone interval and municipality, helping us assess the potential impact of the flood on healthcare accessibility for different population groups.
 
@@ -363,15 +357,9 @@ for (m in 1:nrow(municipalities)) {
 
 ```
 
-## Analysis and evaluation
+# Analysis and evaluation
 
-By combining the isochrone intervals, municipality boundaries, and
-population data, we can gain a comprehensive understanding of the
-changes to physician catchments and healthcare accessibility after the
-flood. This information will be crucial in identifying areas where
-population needs may have increased due to infrastructure damage, and
-aid in planning targeted relief efforts and healthcare resource
-allocation. But a table is hard to extract insights from. Therefore we create a bar plot comparing the amount of people within a isochrone interval for every municipality.
+By combining the isochrone intervals, municipality boundaries, and population data, we can gain a comprehensive understanding of the changes to physician catchments and healthcare accessibility after the flood. This information will be crucial in identifying areas where population needs may have increased due to infrastructure damage, and aid in planning targeted relief efforts and healthcare resource allocation. But a table is hard to extract insights from. Therefore we create a bar plot comparing the amount of people within a isochrone interval for every municipality.
 
 ```{r}
 mun_sort <- mun_isos |> filter(value == 1200 & type == "regular")
@@ -399,7 +387,7 @@ mun_isos |> #filter(value < 9999) |>
 
 What do you see in the plot? What may be the reason some communities do not have any bar for either regular or disaster aware isochrone?
 
-## Add-on: potential service
+# Add-on: potential service
 
 How many physicians potentially serve an area?
 

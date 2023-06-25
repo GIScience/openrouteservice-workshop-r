@@ -14,13 +14,13 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Intro
+# Intro
 
 In times of disaster, such as the devastating flood event that occurred in the Ahr valley in Germany in July 2021, effective and efficient routing becomes crucial for emergency responders, humanitarian organizations, and disaster management teams. Openrouteservice, an open-source routing engine built on OpenStreetMap data, offers a **powerful** and **flexible** solution for **navigation** and **logistics** **planning** in such scenarios.
 
 This training aims to familiarize participants with the capabilities of openrouteservice within R and demonstrate how it can be leveraged to address routing challenges during a disaster. Through a series of code examples we will explore the key features and functionalities of openrouteservice. You will learn how easy it is to interact with openrouteservice from R and be able to integrate it directly into your own workflow.
 
-## Setup
+# Setup
 
 Before we delve into the details of utilizing openrouteservice, let's ensure that we have all the necessary prerequisites in place. The following code chunk provides instructions on how to install the required packages. The openrouteservice R library is currently not published on CRAN, but can be conveniently installed through the devtools packages `install_github` function:
 
@@ -72,15 +72,15 @@ your_api_key <-
   "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
 ```
 
-## Context
+# Context
 
 During the Ahr valley flood event, many roads and bridges were damaged or rendered impassable, posing significant challenges for navigation and transportation. In such situations, openrouteservice can assist in finding optimal paths, calculating travel distances and times, and identifying alternative routes to reach affected areas or deliver essential supplies.
 
-## Simple routing and avoid areas
+# Simple routing and avoid areas
 
 Let's start to use the openrouteservice library by performing a simple A-to-B routing task. We start by defining an origin and destination and then call the api to create a route out of it. The coordinates provided in the code chunk point to the *Nürburgring*, a motorsports complex in rural Rhineland-Palatinate, which served as disaster relief staging area during the emergency response. This is our origin. The destination coordinates point to *Bad Neuenahr-Ahrweiler*, the largest community affected by the flood in Rhineland-Palatinate.
 
-### Regular route from Nürburgring to Bad Neuanahr-Ahrweiler
+## Regular route from Nürburgring to Bad Neuanahr-Ahrweiler
 
 ```{r simple a b route}
 origin <- c(6.943241, 50.334265)
@@ -129,7 +129,7 @@ Check out all available parameters with the interactive API playground here:
 
 For the purpose of disaster aware routing we will now use the lastly mentioned parameter and define an area to be avoided by the route calculation.
 
-### Disaster aware route from Nürburgring to Bad Neuanahr-Ahrweiler
+## Disaster aware route from Nürburgring to Bad Neuanahr-Ahrweiler
 
 First we need to define an area to be avoided from the route calculation. For this purpose we use the `mapedit` package, which allows us to draw a polygon in an interactive mapview.
 
@@ -200,7 +200,7 @@ Feel free to play around with the parameters in the chunks provided above. You c
 
 For example, what if the staging area had been set up in the area of the city of Koblenz (east) or Bonn (north) instead of at the Nürburgring? What would have been the difference in time and distance?
 
-## Multiple Routes
+# Multiple Routes
 
 Building upon the concepts and skills acquired, we tackle a more complex task. We utilize data from the Copernicus Emergency Mapping service, which provides information on destroyed or damaged roads and bridges in the Ahr valley, to calculate routes from the disaster relief staging area at the Nürburgring. Our objective is to reach 36 locations representing the affected communities in the valley.
 
@@ -321,12 +321,9 @@ routes <- routes |>  mutate(dur_diff_abs =
                               )) 
 ```
 
-## Analysis & Evaluation
+# Analysis & Evaluation
 
-In this code chunk, we will take the first step towards analyzing and
-evaluating the travel time differences between regular routes and routes
-that bypass flood-affected infrastructure. We will create classes that
-allow us to extract more meaning and insights from these differences. For this purpose we use the `classInt` package.
+In this code chunk, we will take the first step towards analyzing and evaluating the travel time differences between regular routes and routes that bypass flood-affected infrastructure. We will create classes that allow us to extract more meaning and insights from these differences. For this purpose we use the `classInt` package.
 
 ```{r classify}
 
@@ -358,10 +355,7 @@ routes_avoid$class <- cut(
 )
 ```
 
-Now we will add the classes for route comparison and
-incorporate them into the affected communities. Additionally, we will
-create a regular dataframe from the spatial dataframe to create a more
-lightweight object for non-spatial evaluation in the next step.
+Now we will add the classes for route comparison and incorporate them into the affected communities. Additionally, we will create a regular dataframe from the spatial dataframe to create a more lightweight object for non-spatial evaluation in the next step.
 
 ```{r join class attribute}
 # convert from sf dataframe to non spatial dataframe
@@ -379,11 +373,7 @@ affected_places <- affected_places |>
 
 ```
 
-In the following code chunk, we will create a bar plot for each
-affected community, showcasing the travel time differences between
-regular routes and disaster-aware routes. Before plotting, we will sort
-the data based on a leveled factor x variable to ensure a visually
-appealing and informative representation.
+In the following code chunk, we will create a bar plot for each affected community, showcasing the travel time differences between regular routes and disaster-aware routes. Before plotting, we will sort the data based on a leveled factor x variable to ensure a visually appealing and informative representation.
 
 ```{r non spatial visualization}
 routes_avoid <- routes_avoid |> arrange(desc(dur_diff_abs))
@@ -409,10 +399,7 @@ routes_avoid |>
 
 ```
 
-The bar plot will visually represent these travel time differences,
-allowing for easy comparison among the affected communities. By sorting
-the data based on the leveled factor in the x variable, the plot will
-display the communities in descending traveltime increase.
+The bar plot will visually represent these travel time differences, allowing for easy comparison among the affected communities. By sorting the data based on the leveled factor in the x variable, the plot will display the communities in descending traveltime increase.
 
 -   Class A consists of 6 communities where there is no travel time difference between the regular and disaster-aware routes
 
