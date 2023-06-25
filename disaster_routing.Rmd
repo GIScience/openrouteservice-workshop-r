@@ -293,7 +293,7 @@ for (a in 1:nrow(affected_places)) {
 }
 ```
 
-We see, the communities of Altenburg, Brück 2, Schuld4 and Pützfeld are unfortunately were no longer reachable via regular motorized transport. These communities were the first to be set up with temporary bridges.
+We see, the communities of Altenburg, Brück 2, Schuld4, Pützfeld and Rech are unfortunately were no longer reachable via regular motorized transport. These communities were the first to be set up with temporary bridges.
 
 For the communities, however where could generate disaster aware routes, we are now able to determine access paths. Further we can determine the increase in travel time to the communities. For this purpose we need to do some postprocessing of our results. The chunk below will unpack served attributes by openrouteservice on time and distance information for every route. Then a time difference is calculated as new column.
 
@@ -323,10 +323,12 @@ routes <- routes |>  mutate(dur_diff_abs =
 
 ## Analysis & Evaluation
 
-```{r classify}
+In this code chunk, we will take the first step towards analyzing and
+evaluating the travel time differences between regular routes and routes
+that bypass flood-affected infrastructure. We will create classes that
+allow us to extract more meaning and insights from these differences. For this purpose we use the `classInt` package.
 
-## filter out not reachable
-#affected_places |> filter(name %in% c("Altenburg", "Brück 2", "Schuld 4", "Pützfeld"))
+```{r classify}
 
 # filter for disaster routes only
 routes_avoid <- routes |> filter(type == "avoid")
@@ -356,6 +358,11 @@ routes_avoid$class <- cut(
 )
 ```
 
+Now we will add the classes for route comparison and
+incorporate them into the affected communities. Additionally, we will
+create a regular dataframe from the spatial dataframe to create a more
+lightweight object for non-spatial evaluation in the next step.
+
 ```{r join class attribute}
 # convert from sf dataframe to non spatial dataframe
 st_geometry(routes_avoid) <- NULL
@@ -372,9 +379,16 @@ affected_places <- affected_places |>
 
 ```
 
+In the following code chunk, we will create a bar plot for each
+affected community, showcasing the travel time differences between
+regular routes and disaster-aware routes. Before plotting, we will sort
+the data based on a leveled factor x variable to ensure a visually
+appealing and informative representation.
+
 ```{r non spatial visualization}
 routes_avoid <- routes_avoid |> arrange(desc(dur_diff_abs))
-routes_avoid$destination <- factor(routes_avoid$destination, levels=routes_avoid$destination)
+routes_avoid$destination <-
+  factor(routes_avoid$destination, levels = routes_avoid$destination)
 
 routes_avoid |> 
   ggplot(aes(
@@ -383,8 +397,7 @@ routes_avoid |>
     fill = class
   ))  +
   geom_bar(stat = "Identity") + # chart type
-  labs(main = "title",
-       x = "Affected Places",
+  labs(x = "Affected Places",
        y = "duration difference after flood") +
   scale_color_grey() +
   theme_classic() +
@@ -394,8 +407,20 @@ routes_avoid |>
     hjust = 1
   ))
 
-
 ```
+
+The bar plot will visually represent these travel time differences,
+allowing for easy comparison among the affected communities. By sorting
+the data based on the leveled factor in the x variable, the plot will
+display the communities in descending traveltime increase.
+
+-   Class A consists of 6 communities where there is no travel time difference between the regular and disaster-aware routes
+
+-   Class shows the highest increase in travel time and bears 9 communities. Although the range is more stretched with \~20 min compared to the oter classes
+
+-   Overall the mean traveltime difference is at 13.64 min and the median at 8.64 min. Not including the 5 not reachable communities.
+
+The last chunk visualizes the routes and affected communities by class
 
 ```{r spatial visualization}
 tmap_mode("view")
@@ -409,3 +434,9 @@ tm_shape(affected_places) +
   tm_facets("type", sync = T)
 
 ```
+
+Do you see any spatial pattern?
+
+-   Where are class A communities located, where class E?
+
+-   The communities represented as `missing` are the non reachable communities. Do these have something in common?

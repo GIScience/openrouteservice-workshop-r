@@ -254,7 +254,7 @@ for (a in 1:nrow(physicians)) {
 }
 ```
 
-Well done. Lets look at the result.
+Well done. Lets look at the result in a map.
 
 ```{r viz isochrones}
 
@@ -282,17 +282,31 @@ Any pattern you spot right away?
 
 ### Combine isochrones with population counts by municipality boundaries
 
+The next step in our analysis involves overlaying and intersecting the
+isochrone intervals obtained from openrouteservice with municipality
+boundaries. This allows us to examine the impact of the flood damage on
+the catchments of physicians in the Ahr Valley area. By performing this
+intersection, we can identify the areas within each municipality that
+fall within specific travel time intervals, indicating the accessibility
+of physicians before and after the flood.
+
+Once we have the intersected shapes, we aim to enrich them with population information from the WorldPop dataset. This additional data will provide insights into the population residing within each isochrone interval and municipality, helping us assess the potential impact of the flood on healthcare accessibility for different population groups.
+
+To achieve this, we will utilize the "exactextract" package, which offers zonal statistic methods. These methods enable us to calculate summary statistics within each zone or polygon, in this case, the intersected shapes. By applying the zonal statistic methods, we can derive population-related information such as total population, population density, or any other relevant demographic indicators within each zone.
+
 ```{r, warning=F, message=F}
 
-
+# Iterate over each municipality
 for (m in 1:nrow(municipalities)) {
   mun <- municipalities[m, ] # select single municipality
   
+  # intersect isochrone with municipality boundary
   mun_iso <-
     isochrones |> st_make_valid() |>
     filter(st_intersects(geometry, mun, sparse = F)) |>
     st_intersection(mun) |>
     group_by(value, type) |>
+    # union/dissolve by interval to create continous areas for 300, 600 .. sec
     summarize(geometry = st_union(geometry)) |>
     ungroup() |>
     filter(
@@ -300,7 +314,7 @@ for (m in 1:nrow(municipalities)) {
         st_geometry_type(geometry) == "MULTIPOLYGON"
     )
   
-  
+  # calculate the total pop according to worldpop within the municipality
   mun_total_pop <-
     population |> exact_extract(mun, "sum", progress = T)
   mun_total_area <- mun |>
@@ -308,19 +322,24 @@ for (m in 1:nrow(municipalities)) {
     st_area() |>
     set_units("km^2")
   
+  # add attributes from municiplaity to isochrone
   mun_iso$name <- mun$name
   mun_iso$id <- mun$id
   
-  # add population
+  # execute the zonal statistic - 
+  # extract pop on the municipality isochrone intervals
   mun_iso$population_cum <- population |>
     exact_extract(mun_iso, "sum", progress = F)
   
-  # add area
+  # add area as well
   mun_iso$area_cum <- mun_iso |>
     st_transform(25832) |>
     st_area() |>
     set_units("km^2")
   
+  # right now we have cumulative population counts only.
+  # here we use window functions to 
+  # calculate absolute values per interva
   mun_iso <- mun_iso |>
     group_by(value, type) |>
     arrange(desc(value)) |>
@@ -332,6 +351,7 @@ for (m in 1:nrow(municipalities)) {
     ) |>
     ungroup()
   
+  # check for first iteration to init, else append
   if (m == 1) {
     mun_isos <- mun_iso
     # if not just append to the result sf data frame
@@ -345,9 +365,15 @@ for (m in 1:nrow(municipalities)) {
 
 ## Analysis and evaluation
 
-```{r}
-library(ggplot2)
+By combining the isochrone intervals, municipality boundaries, and
+population data, we can gain a comprehensive understanding of the
+changes to physician catchments and healthcare accessibility after the
+flood. This information will be crucial in identifying areas where
+population needs may have increased due to infrastructure damage, and
+aid in planning targeted relief efforts and healthcare resource
+allocation. But a table is hard to extract insights from. Therefore we create a bar plot comparing the amount of people within a isochrone interval for every municipality.
 
+```{r}
 mun_sort <- mun_isos |> filter(value == 1200 & type == "regular")
 mun_sort <- mun_sort |> arrange(pop_rel)
 mun_isos$name <- factor(mun_isos$name, levels = c(mun_sort$name, "Münsch"))
@@ -355,7 +381,7 @@ mun_isos$name <- factor(mun_isos$name, levels = c(mun_sort$name, "Münsch"))
 
 mun_isos |> #filter(value < 9999) |>
   mutate(value = factor(value, levels = c(seq(300, 1800, 300)))) |>
-  ggplot(aes(x = name, y = pop_rel, fill = type)) +
+  ggplot(aes(x = name, y = pop_rel * 100, fill = type)) +
   geom_bar(stat = "identity", position = position_dodge()) +
   scale_fill_grey() +
   theme_classic() +
@@ -364,62 +390,89 @@ mun_isos |> #filter(value < 9999) |>
     vjust = 1,
     hjust = 1
   )) +
+  labs(x = "Affected Communities",
+       y = "Relative population reached ") +
   facet_wrap(vars(value), nrow = 4)
 
 
 ```
 
-## Add-on: capacity
+What do you see in the plot? What may be the reason some communities do not have any bar for either regular or disaster aware isochrone?
 
-How many physicians potentialy serve an area?
+## Add-on: potential service
 
-```{r}
+How many physicians potentially serve an area?
+
+In addition to determining catchments using isochrones, we now have an exciting opportunity to explore potential service availability in space within the Ahr Valley area. This use case of isochrones allows us to gain insights into the distribution of physicians and their accessibility across different travel time intervals.
+
+In this next section, we will take a closer look at the spatial distribution of healthcare services by sampling hexagons within our study area. These hexagons will serve as spatial units for our analysis. By intersecting these hexagons with the previously obtained isochrones, we will be able to quantify the number of physicians within reach of each hexagon.
+
+This analysis not only provides a quantitative measure of service availability in different parts of the Ahr Valley but also allows us to differentiate the isochrones based on travel time. By observing patterns across the different travel time intervals, we can gain valuable insights into how the accessibility of physicians varies in relation to the affected areas.
+
+By exploring these patterns, we can identify areas with a higher concentration of physicians and areas that may require additional healthcare resources. This information can be crucial for post-disaster planning, resource allocation, and identifying potential gaps in service provision.
+
+First we sample the hexagons and select by which intersect with the municipalities.
+
+```{r create hexagons}
 hexagons <-
   st_sf(geometry = st_make_grid(municipalities, square = F, n = c(50, 50))) |>
   filter(st_intersects(geometry, municipalities |> st_union(), sparse =
                          F))
 ```
 
-## 
+Great. Next we count overlapping isochrones by interval. To showcase this, we use the first 4 intervalls only.
 
-```{r}
+```{r enrich hexagons}
 
+# Create hexagon copies for each interval of interest. This is necessary, as we wanta long table in the end.
 hexagons300 <- hexagons
 hexagons600 <- hexagons
 hexagons900 <- hexagons
 hexagons1200 <- hexagons
 
+# then do the overlap and count for every copy
 hexagons300$value <- 300
 hexagons300$count <- lengths(st_intersects(
-      hexagons, isochrones |> filter(value==300 & type=="regular") |> 
-        st_make_valid()))
+  hexagons,
+  isochrones |> filter(value == 300 & type == "regular") |>
+    st_make_valid()
+))
 
 
 hexagons600$value <- 600
 hexagons600$count <- lengths(st_intersects(
-      hexagons, isochrones |> filter(value==600 & type=="regular") |> 
-        st_make_valid()))
+  hexagons,
+  isochrones |> filter(value == 600 & type == "regular") |>
+    st_make_valid()
+))
 
 
 hexagons900$value <- 900
 hexagons900$count <- lengths(st_intersects(
-      hexagons, isochrones |> filter(value==900 & type=="regular") |> 
-        st_make_valid()))
+  hexagons,
+  isochrones |> filter(value == 900 & type == "regular") |>
+    st_make_valid()
+))
 
 hexagons1200$value <- 1200
 hexagons1200$count <- lengths(st_intersects(
-      hexagons, isochrones |> filter(value==1200 & type=="regular") |> 
-        st_make_valid()))
+  hexagons,
+  isochrones |> filter(value == 1200 & type == "regular") |>
+    st_make_valid()
+))
 
+# combine to one long sf dataframe 
 hexagons_all <- rbind(hexagons300, hexagons600, hexagons900, hexagons1200)
 ```
 
-```{r}
-tm_shape(hexagons_all) +
-  tm_polygons("count", palette="magma", lwd=.1) +
+```{r viz hexagons}
+tm_basemap("OpenStreetMap") +
+  tm_shape(hexagons_all) +
+  tm_polygons("count", palette = "magma", lwd = .1) +
   tm_facets("value")
-
 
 ```
 
-can you repeat this for foot-walking profile?
+Which pattern can you observe when you go from 5 min up to 20 min? Which regions might be over- / undersupplied?
+
+Now you! Can you repeat the workflow with the `foot-walking` profile?
