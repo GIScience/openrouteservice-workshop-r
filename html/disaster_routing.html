@@ -2273,7 +2273,7 @@ zoom: 1;
 		// See discussion in https://github.com/kartena/Proj4Leaflet/pull/147
 		proj4 = proj4.default;
 	}
- 
+
 	L.Proj = {};
 
 	L.Proj._isProj4Obj = function(a) {
@@ -6731,7 +6731,7 @@ library(ggplot2) # visualize (non-) spatial data</code></pre>
 </ul>
 <p>When you sucessfully created your personal API key, copy it over in the chunk below.</p>
 <pre class="r"><code>your_api_key &lt;-
-  &quot;5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24&quot;</code></pre>
+  &quot;YOUR_API_KEY&quot;</code></pre>
 </div>
 <div id="context" class="section level1" number="3">
 <h1 number="3"><span class="header-section-number">3</span> Context</h1>
@@ -6851,8 +6851,8 @@ tmap_mode(&quot;view&quot;)</code></pre>
 </ul>
 <p>You find the files also in the repo this R-Markdown file is located in. <a href="https://github.com/GIScience/openrouteservice-workshop-r/tree/master/data" class="uri">https://github.com/GIScience/openrouteservice-workshop-r/tree/master/data</a></p>
 <pre class="r"><code>affected_roads_bridges &lt;- st_read(&quot;data/affected_roads.gpkg&quot;)</code></pre>
-<pre><code>## Reading layer `affected_roads&#39; from data source 
-##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/affected_roads.gpkg&#39; 
+<pre><code>## Reading layer `affected_roads&#39; from data source
+##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/affected_roads.gpkg&#39;
 ##   using driver `GPKG&#39;
 ## Simple feature collection with 404 features and 0 fields
 ## Geometry type: MULTILINESTRING
@@ -6860,8 +6860,8 @@ tmap_mode(&quot;view&quot;)</code></pre>
 ## Bounding box:  xmin: 6.7779 ymin: 50.37014 xmax: 7.249583 ymax: 50.55296
 ## Geodetic CRS:  WGS 84</code></pre>
 <pre class="r"><code>affected_places &lt;- st_read(&quot;data/affected_places.gpkg&quot;)</code></pre>
-<pre><code>## Reading layer `affected_places&#39; from data source 
-##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/affected_places.gpkg&#39; 
+<pre><code>## Reading layer `affected_places&#39; from data source
+##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/affected_places.gpkg&#39;
 ##   using driver `GPKG&#39;
 ## Simple feature collection with 35 features and 3 fields
 ## Geometry type: POINT
@@ -6905,18 +6905,18 @@ for (a in 1:nrow(affected_places)) {
       ,
       profile = &quot;driving-car&quot;
     )
-    
+
     # add attribute to differentiate the results later
     directions$type &lt;- &quot;regular&quot;
     directions_avoid$type &lt;- &quot;avoid&quot;
     directions &lt;- rbind(directions, directions_avoid)
-    
+
     # add id to relate place and route later on
     directions$id &lt;- a
     affected_places[a, ]$id &lt;- a
     # also add the name of the respective destination of the route
     directions$destination &lt;- affected_places[a, ]$name
-    
+
     # check for the first iteration to init the result sf data frame
     if (a == 1) {
       routes &lt;- directions
@@ -7010,7 +7010,7 @@ affected_places &lt;- affected_places |&gt;
 routes_avoid$destination &lt;-
   factor(routes_avoid$destination, levels = routes_avoid$destination)
 
-routes_avoid |&gt; 
+routes_avoid |&gt;
   ggplot(aes(
     y = dur_diff_abs,
     x = destination,
@@ -7062,7 +7062,7 @@ var leaf_widgets = {};
                      }
                    }
                 );
-               
+
 
 leaf_widgets['htmlwidget-1929'].sync(leaf_widgets['htmlwidget-483'],{syncCursor: true, noInitialSync: true});
 leaf_widgets['htmlwidget-483'].sync(leaf_widgets['htmlwidget-1929'],{syncCursor: true, noInitialSync: true});

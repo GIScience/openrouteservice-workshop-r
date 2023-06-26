@@ -2273,7 +2273,7 @@ zoom: 1;
 		// See discussion in https://github.com/kartena/Proj4Leaflet/pull/147
 		proj4 = proj4.default;
 	}
- 
+
 	L.Proj = {};
 
 	L.Proj._isProj4Obj = function(a) {
@@ -6732,7 +6732,7 @@ provided you in the workshop book here: <a href="https://giscience.github.io/ope
 <p>When you sucessfully created your personal api key, copy it over in
 the chunk below.</p>
 <pre class="r"><code>your_api_key &lt;-
-  &quot;5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24&quot;</code></pre>
+  &quot;YOUR_API_KEY&quot;</code></pre>
 </div>
 <div id="context" class="section level2" number="1.2">
 <h2><span class="header-section-number">1.2</span> Context</h2>
@@ -6878,7 +6878,7 @@ var leaf_widgets = {};
                      }
                    }
                 );
-               
+
 
 leaf_widgets['htmlwidget-4224'].sync(leaf_widgets['htmlwidget-5270'],{syncCursor: true, noInitialSync: true});
 leaf_widgets['htmlwidget-5270'].sync(leaf_widgets['htmlwidget-4224'],{syncCursor: true, noInitialSync: true});
@@ -6910,8 +6910,8 @@ valley <a href="https://hub.worldpop.org/geodata/summary?id=49977" class="uri">h
 <a href="https://gdz.bkg.bund.de/index.php/default/digitale-geodaten/verwaltungsgebiete/verwaltungsgebiete-1-250-000-mit-einwohnerzahlen-stand-31-12-vg250-ew-31-12.html" class="uri">https://gdz.bkg.bund.de/index.php/default/digitale-geodaten/verwaltungsgebiete/verwaltungsgebiete-1-250-000-mit-einwohnerzahlen-stand-31-12-vg250-ew-31-12.html</a></p></li>
 </ul>
 <pre class="r"><code>physicians &lt;- st_read(&quot;data/physicians.gpkg&quot;)</code></pre>
-<pre><code>## Reading layer `amenity_hospital_healthcare&#39; from data source 
-##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/physicians.gpkg&#39; 
+<pre><code>## Reading layer `amenity_hospital_healthcare&#39; from data source
+##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/physicians.gpkg&#39;
 ##   using driver `GPKG&#39;
 ## Simple feature collection with 20 features and 4 fields
 ## Geometry type: POINT
@@ -6920,8 +6920,8 @@ valley <a href="https://hub.worldpop.org/geodata/summary?id=49977" class="uri">h
 ## Geodetic CRS:  WGS 84</code></pre>
 <pre class="r"><code>population &lt;- rast(&quot;data/wpop_ahrvalley.tif&quot;)
 municipalities &lt;- st_read(&quot;data/affected_municipalities.gpkg&quot;)</code></pre>
-<pre><code>## Reading layer `municipalities&#39; from data source 
-##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/affected_municipalities.gpkg&#39; 
+<pre><code>## Reading layer `municipalities&#39; from data source
+##   `/home/mreinmuth/giscience/FOSS4G/openrouteservice-workshop-r/data/affected_municipalities.gpkg&#39;
 ##   using driver `GPKG&#39;
 ## Simple feature collection with 20 features and 3 fields
 ## Geometry type: MULTIPOLYGON
@@ -6961,18 +6961,18 @@ while, you may have a coffe in the mean time.</p>
       options = options,
       range_type = &quot;time&quot;
     )
-    
+
     # add attribute to differentiate the results later
     isochrone_regular$type &lt;- &quot;regular&quot;
     isochrone_avoid$type &lt;- &quot;avoid&quot;
     isochrone &lt;- rbind(isochrone_regular, isochrone_avoid)
-    
+
     # add id to relate place and isochrone later on
     isochrone$id &lt;- a
     physicians[a,]$id &lt;- a
     # also add the name of the respective physician to the isochrone
     isochrone$destination &lt;- physicians[a,]$name
-    
+
     # check for the first iteration to init the result sf data frame
     if (a == 1) {
       isochrones &lt;- isochrone
@@ -6989,7 +6989,7 @@ while, you may have a coffe in the mean time.</p>
         &quot;Error on center: {physicians[a,]$name}; iteration: {a}/{nrow(physicians)}&quot;
       )
     )
-    
+
   })
 }</code></pre>
 <p>Well done. Lets look at the result in a map.</p>
@@ -7030,7 +7030,7 @@ var leaf_widgets = {};
                      }
                    }
                 );
-               
+
 
 leaf_widgets['htmlwidget-6507'].sync(leaf_widgets['htmlwidget-8259'],{syncCursor: true, noInitialSync: true});
 leaf_widgets['htmlwidget-8259'].sync(leaf_widgets['htmlwidget-6507'],{syncCursor: true, noInitialSync: true});
@@ -7064,7 +7064,7 @@ each zone.</p>
 <pre class="r"><code># Iterate over each municipality
 for (m in 1:nrow(municipalities)) {
   mun &lt;- municipalities[m, ] # select single municipality
-  
+
   # intersect isochrone with municipality boundary
   mun_iso &lt;-
     isochrones |&gt; st_make_valid() |&gt;
@@ -7078,7 +7078,7 @@ for (m in 1:nrow(municipalities)) {
       st_geometry_type(geometry) == &quot;POLYGON&quot; |
         st_geometry_type(geometry) == &quot;MULTIPOLYGON&quot;
     )
-  
+
   # calculate the total pop according to worldpop within the municipality
   mun_total_pop &lt;-
     population |&gt; exact_extract(mun, &quot;sum&quot;, progress = T)
@@ -7086,24 +7086,24 @@ for (m in 1:nrow(municipalities)) {
     st_transform(25832) |&gt;
     st_area() |&gt;
     set_units(&quot;km^2&quot;)
-  
+
   # add attributes from municiplaity to isochrone
   mun_iso$name &lt;- mun$name
   mun_iso$id &lt;- mun$id
-  
-  # execute the zonal statistic - 
+
+  # execute the zonal statistic -
   # extract pop on the municipality isochrone intervals
   mun_iso$population_cum &lt;- population |&gt;
     exact_extract(mun_iso, &quot;sum&quot;, progress = F)
-  
+
   # add area as well
   mun_iso$area_cum &lt;- mun_iso |&gt;
     st_transform(25832) |&gt;
     st_area() |&gt;
     set_units(&quot;km^2&quot;)
-  
+
   # right now we have cumulative population counts only.
-  # here we use window functions to 
+  # here we use window functions to
   # calculate absolute values per interva
   mun_iso &lt;- mun_iso |&gt;
     group_by(value, type) |&gt;
@@ -7115,7 +7115,7 @@ for (m in 1:nrow(municipalities)) {
       pop_rel = pop / mun_total_pop
     ) |&gt;
     ungroup()
-  
+
   # check for first iteration to init, else append
   if (m == 1) {
     mun_isos &lt;- mun_iso
@@ -7123,7 +7123,7 @@ for (m in 1:nrow(municipalities)) {
   } else {
     mun_isos &lt;- rbind(mun_isos, mun_iso)
   }
-  
+
 }</code></pre>
 </div>
 </div>
@@ -7233,7 +7233,7 @@ hexagons1200$count &lt;- lengths(st_intersects(
     st_make_valid()
 ))
 
-# combine to one long sf dataframe 
+# combine to one long sf dataframe
 hexagons_all &lt;- rbind(hexagons300, hexagons600, hexagons900, hexagons1200)</code></pre>
 <pre class="r"><code>tm_basemap(&quot;OpenStreetMap&quot;) +
   tm_shape(hexagons_all) +
@@ -7266,7 +7266,7 @@ var leaf_widgets = {};
                      }
                    }
                 );
-               
+
 
 leaf_widgets['htmlwidget-6894'].sync(leaf_widgets['htmlwidget-1423'],{syncCursor: true, noInitialSync: true});
 leaf_widgets['htmlwidget-6982'].sync(leaf_widgets['htmlwidget-1423'],{syncCursor: true, noInitialSync: true});
