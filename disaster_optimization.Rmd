@@ -72,7 +72,7 @@ When you sucessfully created your personal api key, copy it over in the chunk be
 
 ```{r setting the api key}
 your_api_key <-
-  "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
+  "YOUR_API_KEY"
 ```
 
 # Logistics Setup
@@ -298,9 +298,9 @@ ttable1 <- do.call(rbind,
             c(
               station_id = ifelse(x$type %in% c("start","end"),x$type,x$id),
               arrival = ifelse(x$type != "start",x$arrival |> 
-                                 as.POSIXct() |> as.character(),"-"),
+                                 as.POSIXct(origin="1970-01-01", tz="UTC") |> as.character(),"-"),
               departure = ifelse(x$type == "end","-",x$arrival |> 
-                                 as.POSIXct() |> as.character()),
+                                 as.POSIXct(origin="1970-01-01", tz="UTC") |> as.character()),
               load = x$load
             )
         )) |> data.frame()
@@ -316,9 +316,9 @@ ttable2 <- do.call(rbind,
             c(
               station_id = ifelse(x$type %in% c("start","end"),x$type,x$id),
               arrival = ifelse(x$type != "start",x$arrival |> 
-                                 as.POSIXct() |> as.character(),"-"),
+                                 as.POSIXct(origin="1970-01-01", tz="UTC") |> as.character(),"-"),
               departure = ifelse(x$type == "end","-",x$arrival |> 
-                                 as.POSIXct() |> as.character()),
+                                 as.POSIXct(origin="1970-01-01", tz="UTC") |> as.character()),
               load = x$load
             )
         )) |> data.frame()
@@ -334,9 +334,9 @@ ttable3 <- do.call(rbind,
             c(
               station_id = ifelse(x$type %in% c("start","end"),x$type,x$id),
               arrival = ifelse(x$type != "start",x$arrival |> 
-                                 as.POSIXct() |> as.character(),"-"),
+                                 as.POSIXct(origin="1970-01-01", tz="UTC") |> as.character(),"-"),
               departure = ifelse(x$type == "end","-",x$arrival |> 
-                                 as.POSIXct() |> as.character()),
+                                 as.POSIXct(origin="1970-01-01", tz="UTC") |> as.character()),
               load = x$load
             )
         )) |> data.frame()

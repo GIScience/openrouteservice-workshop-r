@@ -69,7 +69,7 @@ When you sucessfully created your personal API key, copy it over in the chunk be
 
 ```{r setting the api key}
 your_api_key <-
-  "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
+  "YOUR_API_KEY"
 ```
 
 # Context

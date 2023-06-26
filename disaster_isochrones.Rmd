@@ -62,7 +62,7 @@ When you sucessfully created your personal api key, copy it over in the chunk be
 
 ```{r setting the api key}
 your_api_key <-
-  "5b3ce3597851110001cf6248294450eef1f744d4b12a5d571ef3ae24"
+  "YOUR_API_KE"
 ```
 
 ## Context
@@ -197,7 +197,7 @@ municipalities <- st_read("data/affected_municipalities.gpkg")
 
 Similar to the directions exercise, we conduct multiple openrouteservice requests in a loop. We loop over all physicians, as they serve as the center for our isochrone analysis. We request a regular isochrone and one with avoid polygons. Then we add some additional attributes from our physician dataset to the response isochrones and save them in a sf dataframe. This may take a little while, you may have a coffe in the mean time.
 
-```{r loop regular and disaster routes to comm}
+```{r loop regular and disaster routes to comm, warning=F, message=F}
 for (a in 1:nrow(physicians)) {
   tryCatch({
     # request a regular isochrone around location of physician
