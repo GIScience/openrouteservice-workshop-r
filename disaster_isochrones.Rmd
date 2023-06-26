@@ -14,7 +14,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Intro
+# Introduction
 
 During times of disaster, such as the devastating flood event in Germany's Ahr valley in July 2021, isochrones can support emergency responders, humanitarian organizations, and disaster management teams. Openrouteservice, an open-source routing engine utilizing OpenStreetMap data, offers a flexible and powerful solution for generating isochrones and addressing logistical challenges in such critical situations.
 
@@ -67,7 +67,7 @@ your_api_key <-
 
 ## Context
 
-During the Ahr valley flood event, many roads and bridges were damaged or rendered impassable, posing significant challenges for navigation and transportation. You may have already done the other exercise on disaster aware routing in the ahr valley during the flood disaster. There we used the avoid areas parameter of openrouteservices directions endpoint to calculate routes which do not intersect with determined areas, in this very case flooded areas. But openrouteservic can also combine avoid areas with isochrones.
+During the Ahr valley flood event, many roads and bridges were damaged or rendered impassable, posing significant challenges for navigation and transportation. You may have already done the other exercise on disaster aware routing in the Ahr valley during the flood disaster. There we used the avoid areas parameter of openrouteservices directions endpoint to calculate routes which do not intersect with determined areas, in this very case bridges and roads destroyed by the flood. But openrouteservice can also combine avoid areas with isochrones.
 
 What is an isochrone again?
 
@@ -177,7 +177,7 @@ tm_facets("type") +
 
 # Multiple Isochrones - local physicians catchments
 
-In the next part of the exercise, we will utilize the openrouteservice isochrone API to generate catchment areas with a travel time of 30 minutes for each of the 20 physician locations in the Ahr valley. This analysis will involve creating regular isochrones as well as isochrones that account for avoid areas, specifically areas that do not intersect with damaged infrastructure caused by the flood disaster. To gain further insights, we will integrate population data and examine any changes in catchment areas resulting from the impact of the flood disaster. This comprehensive approach will provide valuable information for assessing healthcare accessibility and the potential challenges faced during the disaster.
+In the next part of the exercise, we will utilize the openrouteservice isochrone API to generate catchment areas with a travel time of 30 minutes for each of the 20 physician locations in the Ahr valley. This analysis will involve creating regular isochrones as well as isochrones that account for avoid roads damaged by the flood disaster. To gain further insights, we will integrate population data and examine any changes in catchment areas resulting from the impact of the flood disaster. This comprehensive approach will provide valuable information for assessing healthcare accessibility and the potential challenges faced during the disaster.
 
 For this purpose we need the following additonal datasets:
 

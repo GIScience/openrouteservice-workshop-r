@@ -60,12 +60,12 @@ The main libraries at one glance:
 -   `sf` the dplyr equivalent to work with spatial data.frames. Pebesma, E., & Bivand, R. (2023). Spatial Data Science: With Applications in R (1st ed.). Chapman and Hall/CRC. <https://doi.org/10.1201/9780429459016>
 -   `openrouteservice` is the package that provides a user firendly R interface to the openrouteservice API. The package is not published on CRAN, therefore we install it via the `devtools` package from github. <https://github.com/GIScience/openrouteservice-r>
 
-In order to use the openrouteservice public api you need to register yourself an account and create an api key.
+In order to use the openrouteservice public API you need to register yourself an account and create an API key.
 
 -   Sign up here: [openrouteservice.org/dev/#/login](https://openrouteservice.org/dev/#/login)
 -   Or consult our step by step guide as part of the resources we've provided you in the workshop book here: [giscience.github.io/openrouteservice-workshop](https://giscience.github.io/openrouteservice-workshop)
 
-When you sucessfully created your personal api key, copy it over in the chunk below.
+When you sucessfully created your personal API key, copy it over in the chunk below.
 
 ```{r setting the api key}
 your_api_key <-
@@ -78,7 +78,7 @@ During the Ahr valley flood event, many roads and bridges were damaged or render
 
 # Simple routing and avoid areas
 
-Let's start to use the openrouteservice library by performing a simple A-to-B routing task. We start by defining an origin and destination and then call the api to create a route out of it. The coordinates provided in the code chunk point to the *Nürburgring*, a motorsports complex in rural Rhineland-Palatinate, which served as disaster relief staging area during the emergency response. This is our origin. The destination coordinates point to *Bad Neuenahr-Ahrweiler*, the largest community affected by the flood in Rhineland-Palatinate.
+Let's start to use the openrouteservice library by performing a **simple A-to-B routing task**. We start by defining an origin and destination and then call the API to create a route out of it. The coordinates provided in the code chunk point to the *Nürburgring*, a motorsports complex in rural Rhineland-Palatinate, which served as staging area during the emergency response. In this area, rescue helpers from all over Germany were stationed to sleep, eat and repair their equipment inbetween deployments. 
 
 ## Regular route from Nürburgring to Bad Neuanahr-Ahrweiler
 
@@ -107,11 +107,11 @@ route <- ors_directions(
 
 ```
 
-The `ors_directions` function consumes a list of numeric vectors which contain the coordinates of origin and destination. You can also add waypoints (up to 50.) in between. Via the output parameter you can control the structure of the response. The library supports common spatial classes like `sf` and `sp` but text and geojson as well. We set `instructions=FALSE` to prevent the response to contain text based navigation instructions (these can get quite large). Important parameters we did not set, but used the defaults are:
+The `ors_directions` function consumes a list of numeric vectors which contain the coordinates of origin and destination. You can also add up to 50 waypoints in between. Via the output parameter you can control the structure of the response. The library supports common spatial classes like `sf` and `sp` but text and geojson as well. We set `instructions=FALSE` to prevent the response to contain text based navigation instructions (these can get quite large). Important parameters we did not set, but used the defaults are:
 
 -   profile: The default is `driving-car`, however `pedestrian`, different `cycle`, `heavy vehicles`, `wheelchair` are possible as well
 
--   preference: The default is `fastest`. Shortests and recommended are other possible values.
+-   preference: The default is `fastest`. `shortest` and `recommended` are other possible values.
 
 -   options: Not set by default. It represents an additional object with further parameters to individualize the request like:
 
