@@ -1,0 +1,25 @@
+---
+title: "Openrouteservice for disaster use cases with R"
+author: "Marcel Reinmuth"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    theme: cerulean
+---
+
+
+Find the rendered notebooks here:
+
+* [Disaster aware routing with openrouteservice in R](https://giscience.github.io/openrouteservice-workshop-r/html/disaster_routing.html)
+* [Disaster aware isochrones with openrouteservice](https://giscience.github.io/openrouteservice-workshop-r/html/disaster_isochrones.html)
+* [Optimizing logistics in disaster situations](https://giscience.github.io/openrouteservice-workshop-r/html/disaster_optimization.html)
+
+
+Find the notebooks source here:
+
+* [Disaster aware routing with openrouteservice in R](https://github.com/GIScience/openrouteservice-workshop-r/blob/master/disaster_routing.Rmd)
+* [Disaster aware isochrones with openrouteservice](https://github.com/GIScience/openrouteservice-workshop-r/blob/master//disaster_isochrones.Rmd)
+* [Optimizing logistics in disaster situations](https://github.com/GIScience/openrouteservice-workshop-r/blob/master/disaster_optimization.Rmd)
